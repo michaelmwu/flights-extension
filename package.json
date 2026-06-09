@@ -41,7 +41,7 @@
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
+    "@biomejs/biome": "^2.4.16",
     "@playwright/test": "^1.60.0",
     "@types/chrome": "^0.1.34",
     "@types/node": "^25.0.3",
