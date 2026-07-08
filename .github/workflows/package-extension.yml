@@ -85,7 +85,6 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}
           MOOFLIGHTS_CRX_KEY_B64: ${{ secrets.MOOFLIGHTS_CRX_KEY_B64 }}
-          MU_TRAVEL_CRX_KEY_B64: ${{ secrets.MU_TRAVEL_CRX_KEY_B64 }}
           MOOFLIGHTS_REQUIRE_CRX_KEY: ${{ env.RELEASE_TAG != '' && '1' || '' }}
         run: bun run package
 
