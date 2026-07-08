@@ -7,10 +7,7 @@ import { browserTarget } from "./browser-target.mjs";
 const execFileAsync = promisify(execFile);
 const root = process.cwd();
 const browser = browserTarget();
-const stableDist =
-  process.argv.includes("--stable-dist") ||
-  process.env.MOOFLIGHTS_STABLE_EXTENSION_DIST === "1" ||
-  process.env.MU_TRAVEL_STABLE_EXTENSION_DIST === "1";
+const stableDist = process.argv.includes("--stable-dist") || process.env.MOOFLIGHTS_STABLE_EXTENSION_DIST === "1";
 const packageRoot = await packageRootPath();
 const artifacts = resolve(packageRoot, "artifacts");
 const packageVersion = await extensionVersion();
@@ -45,7 +42,7 @@ if (browser !== "firefox") {
   }
 
   const keyPath = await crxKeyPath();
-  if (!keyPath && (process.env.MOOFLIGHTS_REQUIRE_CRX_KEY === "1" || process.env.MU_TRAVEL_REQUIRE_CRX_KEY === "1")) {
+  if (!keyPath && process.env.MOOFLIGHTS_REQUIRE_CRX_KEY === "1") {
     throw new Error(
       "A stable CRX signing key is required for release packaging. Set MOOFLIGHTS_CRX_KEY_B64 or MOOFLIGHTS_CRX_KEY_PATH.",
     );
@@ -89,7 +86,7 @@ async function packageRootPath() {
 }
 
 function distPath() {
-  const override = process.env.MOOFLIGHTS_DIST_DIR || process.env.MU_TRAVEL_DIST_DIR || "";
+  const override = process.env.MOOFLIGHTS_DIST_DIR || "";
   if (override) return resolve(root, override);
   return resolve(packageRoot, browser === "firefox" ? ".context/firefox-build" : "dist");
 }
@@ -97,9 +94,7 @@ function distPath() {
 async function removeExistingPackageArtifacts() {
   const entries = await readdir(artifacts);
   const packageArtifactPattern =
-    browser === "firefox"
-      ? /^mooflights-firefox-\d+\.\d+\.\d+\.xpi$/
-      : /^(?:mooflights|mu-travel-flights)(?:-\d+\.\d+\.\d+)?\.(zip|crx)$/;
+    browser === "firefox" ? /^mooflights-firefox-\d+\.\d+\.\d+\.xpi$/ : /^mooflights(?:-\d+\.\d+\.\d+)?\.(zip|crx)$/;
   await Promise.all(
     entries
       .filter((entry) => packageArtifactPattern.test(entry))
@@ -139,7 +134,7 @@ async function chromeExecutable() {
 }
 
 async function crxKeyPath() {
-  const crxKeyB64 = process.env.MOOFLIGHTS_CRX_KEY_B64 || process.env.MU_TRAVEL_CRX_KEY_B64;
+  const crxKeyB64 = process.env.MOOFLIGHTS_CRX_KEY_B64;
   if (crxKeyB64) {
     const path = resolve(artifacts, ".mooflights-crx-key.pem");
     await writeFile(path, Buffer.from(crxKeyB64, "base64"));
@@ -150,5 +145,5 @@ async function crxKeyPath() {
 }
 
 function crxKeyPathEnv() {
-  return process.env.MOOFLIGHTS_CRX_KEY_PATH || process.env.MU_TRAVEL_CRX_KEY_PATH || "";
+  return process.env.MOOFLIGHTS_CRX_KEY_PATH || "";
 }

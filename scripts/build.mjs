@@ -9,16 +9,9 @@ const execFileAsync = promisify(execFile);
 const root = process.cwd();
 const watch = process.argv.includes("--watch");
 const browser = browserTarget();
-const stableDist =
-  process.argv.includes("--stable-dist") ||
-  process.env.MOOFLIGHTS_STABLE_EXTENSION_DIST === "1" ||
-  process.env.MU_TRAVEL_STABLE_EXTENSION_DIST === "1";
+const stableDist = process.argv.includes("--stable-dist") || process.env.MOOFLIGHTS_STABLE_EXTENSION_DIST === "1";
 const dist = await distPath();
-const devBuild =
-  watch ||
-  process.argv.includes("--dev") ||
-  process.env.MOOFLIGHTS_DEV_BUILD === "1" ||
-  process.env.MU_TRAVEL_DEV_BUILD === "1";
+const devBuild = watch || process.argv.includes("--dev") || process.env.MOOFLIGHTS_DEV_BUILD === "1";
 
 const entries = [
   {
@@ -80,7 +73,6 @@ async function buildEntry(entry) {
     define: {
       "process.env.NODE_ENV": JSON.stringify(devBuild ? "development" : "production"),
       __MOOFLIGHTS_DEV_BUILD__: JSON.stringify(devBuild),
-      __MU_TRAVEL_DEV_BUILD__: JSON.stringify(devBuild),
     },
   };
 }
@@ -248,7 +240,6 @@ function unique(values) {
 
 async function distPath() {
   if (process.env.MOOFLIGHTS_DIST_DIR) return resolve(process.env.MOOFLIGHTS_DIST_DIR);
-  if (process.env.MU_TRAVEL_DIST_DIR) return resolve(process.env.MU_TRAVEL_DIST_DIR);
   const directoryName = browser === "firefox" ? ".context/firefox-build" : "dist";
   if (!stableDist) return resolve(root, directoryName);
 

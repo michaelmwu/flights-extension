@@ -72,7 +72,7 @@ bun run test
 bun run package
 ```
 
-This writes versioned packages such as `artifacts/mooflights-0.0.8.zip` and `artifacts/mooflights-0.0.8.crx`. The CRX step requires Google Chrome or Chromium; set `CHROME_BIN` if it is not in a standard location. Set `MOOFLIGHTS_CRX_KEY_PATH` or `MOOFLIGHTS_CRX_KEY_B64` when a stable CRX key is needed; otherwise Chrome generates a throwaway package key during packaging. Legacy `MU_TRAVEL_*` packaging variables are still accepted for existing local setups.
+This writes versioned packages such as `artifacts/mooflights-0.0.8.zip` and `artifacts/mooflights-0.0.8.crx`. The CRX step requires Google Chrome or Chromium; set `CHROME_BIN` if it is not in a standard location. Set `MOOFLIGHTS_CRX_KEY_PATH` or `MOOFLIGHTS_CRX_KEY_B64` when a stable CRX key is needed; otherwise Chrome generates a throwaway package key during packaging.
 
 For Firefox development packaging:
 
