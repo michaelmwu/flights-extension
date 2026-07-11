@@ -18,6 +18,7 @@ import {
   isAllGoogleFlightsCountryCodes,
 } from "../shared/googleFlightsCountries";
 import { createTranslator, htmlLang, LANGUAGE_OPTIONS } from "../shared/i18n";
+import { MooAccountPanel } from "../shared/MooAccountPanel";
 import {
   type MileageProgramOption,
   mileageProgramTierOptions,
@@ -33,6 +34,7 @@ function Options(): React.ReactElement {
   const [programSearch, setProgramSearch] = useState("");
   const [googleFlightsCountrySearch, setGoogleFlightsCountrySearch] = useState("");
   const [saved, setSaved] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const t = useMemo(() => createTranslator(settings.language), [settings.language]);
   const airportAreas = useMemo(() => airportAreaOptions(settings.language), [settings.language]);
   const googleFlightsCountries = useMemo(
@@ -48,7 +50,13 @@ function Options(): React.ReactElement {
   );
 
   useEffect(() => {
-    void loadSettings().then(setSettings);
+    void loadSettings().then(
+      (loadedSettings) => {
+        setSettings(loadedSettings);
+        setSettingsLoaded(true);
+      },
+      () => setSettingsLoaded(true),
+    );
   }, []);
 
   useEffect(() => {
@@ -145,7 +153,7 @@ function Options(): React.ReactElement {
   const hiddenProviders = configurableProviders.filter((provider) => settings.hiddenProviderIds.includes(provider.id));
 
   return (
-    <main>
+    <main inert={!settingsLoaded} aria-busy={!settingsLoaded}>
       <header>
         <div className="title">
           <img src={chrome.runtime.getURL("assets/extension-icons/icon-48.png")} alt="" width="48" height="48" />
@@ -156,6 +164,8 @@ function Options(): React.ReactElement {
         </div>
         <span>{saved ? t("saved") : " "}</span>
       </header>
+
+      <MooAccountPanel t={t} />
 
       <section>
         <h2>{t("general")}</h2>

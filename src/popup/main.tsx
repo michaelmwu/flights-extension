@@ -3,6 +3,7 @@ import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createTranslator, htmlLang } from "../shared/i18n";
+import { MooAccountPanel } from "../shared/MooAccountPanel";
 import { LOCAL_PROVIDERS } from "../shared/providers";
 import { DEFAULT_SETTINGS, loadSettings, mergeSettings, SETTINGS_KEY } from "../shared/storage";
 import type { ExtensionSettings } from "../shared/types";
@@ -43,6 +44,8 @@ function Popup(): React.ReactElement {
         <h1>{t("appName")}</h1>
         <p>{t("popupTagline")}</p>
       </header>
+
+      <MooAccountPanel t={t} compact />
 
       <section>
         <dl>

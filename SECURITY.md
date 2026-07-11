@@ -10,6 +10,10 @@ Use GitHub private vulnerability reporting if it is available for this repositor
 
 - Never commit real `.env` files, tokens, private keys, credentials, production data, or browser profile data.
 - Never add `POSTGRES_URL`, service-role keys, OAuth client secrets, affiliate secrets, or premium entitlement logic to extension code.
+- Moo Account is a public OIDC client. Keep state, nonce, PKCE verifier, access tokens, and refresh tokens in the
+  background runtime. Never return token material to popup/options callers or content scripts.
+- Persist account credentials only in extension-origin private storage. Account commands must reject content-script and
+  foreign-extension senders.
 - Keep backend debugging behind public HTTPS API endpoints or local development URLs.
 - Use `.env.example` only for documented placeholder configuration when this repo needs environment variables.
 

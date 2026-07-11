@@ -37,6 +37,7 @@
     "webstore:submit": "node scripts/submit-chrome-webstore.mjs"
   },
   "dependencies": {
+    "oauth4webapi": "^3.8.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },

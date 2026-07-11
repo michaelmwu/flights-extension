@@ -1,4 +1,5 @@
 type BrowserApi = {
+  identity?: Record<string, unknown>;
   permissions?: Record<string, unknown>;
   runtime?: Record<string, unknown>;
   storage?: {
@@ -19,7 +20,10 @@ function installFirefoxChromePromiseCompat(): void {
   if (!browserApi || !chromeApi || browserApi === chromeApi) return;
 
   wrapPromiseMethod(chromeApi.runtime, browserApi.runtime, "sendMessage");
+  wrapPromiseMethod(chromeApi.identity, browserApi.identity, "getRedirectURL");
+  wrapPromiseMethod(chromeApi.identity, browserApi.identity, "launchWebAuthFlow");
   wrapPromiseMethod(chromeApi.permissions, browserApi.permissions, "contains");
+  wrapPromiseMethod(chromeApi.permissions, browserApi.permissions, "getAll");
   wrapPromiseMethod(chromeApi.permissions, browserApi.permissions, "request");
   wrapPromiseMethod(chromeApi.storage?.local, browserApi.storage?.local, "get");
   wrapPromiseMethod(chromeApi.storage?.local, browserApi.storage?.local, "set");

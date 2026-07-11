@@ -8,6 +8,9 @@ export default async function globalSetup(): Promise<void> {
     env: {
       ...process.env,
       MOOFLIGHTS_DIST_DIR: "dist",
+      MOOFLIGHTS_AUTH_ISSUER: "https://id.michaelmwu.com",
+      MOOFLIGHTS_AUTH_CLIENT_ID: "mooflights-extension-e2e",
+      MOOFLIGHTS_AUTH_AUDIENCE: "https://api.mootravel.app",
     },
   });
 }

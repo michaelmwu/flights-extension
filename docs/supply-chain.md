@@ -42,3 +42,7 @@ Dependency changes must preserve the offline-first extension boundary:
 - Do not add packages that require backend credentials in extension code.
 - Do not move private MooTravel backend logic into this repository.
 - Prefer browser-safe shared code under `src/shared/` for functionality that must run offline.
+
+`oauth4webapi` is the account-enabled background runtime's standards implementation for OpenID discovery,
+Authorization Code + PKCE, ID Token verification, refresh, and revocation. It has no transitive runtime dependencies and
+must not be imported by content-script entrypoints.
