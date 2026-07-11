@@ -1,4 +1,10 @@
-import { isPersistedMooAccountSession, type PersistedMooAccountSession } from "./accountSessionStore";
+import "fake-indexeddb/auto";
+
+import {
+  IndexedDbMooAccountSessionStore,
+  isPersistedMooAccountSession,
+  type PersistedMooAccountSession,
+} from "./accountSessionStore";
 
 const SESSION: PersistedMooAccountSession = {
   version: 1,
@@ -26,5 +32,37 @@ describe("private Moo Account session storage", () => {
     expect(isPersistedMooAccountSession({ ...SESSION, version: 2 })).toBe(false);
     expect(isPersistedMooAccountSession({ ...SESSION, accessTokenExpiresAt: "soon" })).toBe(false);
     expect(isPersistedMooAccountSession({ accessToken: "legacy-token" })).toBe(false);
+  });
+
+  it("persists and clears sessions in extension-private IndexedDB", async () => {
+    const store = new IndexedDbMooAccountSessionStore();
+    await store.clear();
+
+    await store.set(SESSION);
+    await expect(store.get()).resolves.toEqual(SESSION);
+
+    await store.clear();
+    await expect(store.get()).resolves.toBeNull();
+  });
+
+  it("retries IndexedDB initialization after an open failure", async () => {
+    const realIndexedDb = globalThis.indexedDB;
+    Object.defineProperty(globalThis, "indexedDB", {
+      configurable: true,
+      value: {
+        open: () => {
+          throw new Error("temporarily unavailable");
+        },
+      },
+    });
+    const store = new IndexedDbMooAccountSessionStore();
+
+    try {
+      await expect(store.get()).rejects.toThrow("temporarily unavailable");
+    } finally {
+      Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: realIndexedDb });
+    }
+    await store.set(SESSION);
+    await expect(store.get()).resolves.toEqual(SESSION);
   });
 });

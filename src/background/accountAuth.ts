@@ -193,34 +193,39 @@ export class MooAccountAuthController {
       expectedNonce: nonce,
       requireIdToken: true,
     });
-    await this.assertSignInCanUseNetwork(generation);
-    await oauth.validateApplicationLevelSignature(
-      authorizationServer,
-      tokenResponse,
-      this.requestOptions<oauth.ValidateSignatureOptions>(),
-    );
-    await this.assertSignInCanUseNetwork(generation);
-    const claims = oauth.getValidatedIdTokenClaims(tokens);
-    if (!claims?.sub) throw new Error("The Moo Account identity response did not contain a subject.");
+    let session: PersistedMooAccountSession;
+    try {
+      await this.assertSignInCanUseNetwork(generation);
+      await oauth.validateApplicationLevelSignature(
+        authorizationServer,
+        tokenResponse,
+        this.requestOptions<oauth.ValidateSignatureOptions>(),
+      );
+      await this.assertSignInCanUseNetwork(generation);
+      const claims = oauth.getValidatedIdTokenClaims(tokens);
+      if (!claims?.sub) throw new Error("The Moo Account identity response did not contain a subject.");
 
-    const profile = accountProfile(claims);
-    const authenticatedAt = new Date(this.now()).toISOString();
-    const session: PersistedMooAccountSession = {
-      version: 1,
-      issuer: config.issuer,
-      clientId: config.clientId,
-      audience: config.audience,
-      subject: claims.sub,
-      displayName: profile.displayName,
-      ...(profile.email ? { email: profile.email } : {}),
-      emailVerified: profile.emailVerified,
-      accessToken: tokens.access_token,
-      ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}),
-      tokenType: tokens.token_type,
-      scope: tokens.scope || AUTH_SCOPES.join(" "),
-      accessTokenExpiresAt: accessTokenExpiry(this.now(), tokens.expires_in),
-      authenticatedAt,
-    };
+      const profile = accountProfile(claims);
+      session = {
+        version: 1,
+        issuer: config.issuer,
+        clientId: config.clientId,
+        audience: config.audience,
+        subject: claims.sub,
+        displayName: profile.displayName,
+        ...(profile.email ? { email: profile.email } : {}),
+        emailVerified: profile.emailVerified,
+        accessToken: tokens.access_token,
+        ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}),
+        tokenType: tokens.token_type,
+        scope: tokens.scope || AUTH_SCOPES.join(" "),
+        accessTokenExpiresAt: accessTokenExpiry(this.now(), tokens.expires_in),
+        authenticatedAt: new Date(this.now()).toISOString(),
+      };
+    } catch (error) {
+      await this.revokeIssuedTokensIfAllowed(tokens.access_token, tokens.refresh_token, generation);
+      throw error;
+    }
     if (!(await this.storeIssuedSession(session, generation))) {
       throw new MooAccountAuthError("sign_in_cancelled", "Moo Account sign-in was cancelled.");
     }
@@ -313,9 +318,10 @@ export class MooAccountAuthController {
     previousSession?: PersistedMooAccountSession,
   ): Promise<boolean> {
     try {
-      const stored = await this.storeSession(session, generation);
-      if (!stored) await this.revokeIssuedSessionIfAllowed(session, generation);
-      return stored;
+      const result = await this.storeSession(session, generation);
+      if (!result.stored) await this.revokeIssuedSessionIfAllowed(session, generation);
+      if (result.replaced) await this.revokeSession(result.replaced).catch(() => undefined);
+      return result.stored;
     } catch (error) {
       await this.revokeIssuedSessionIfAllowed(session, generation);
       await this.clearSession(session, generation).catch(() => false);
@@ -324,11 +330,18 @@ export class MooAccountAuthController {
     }
   }
 
-  private storeSession(session: PersistedMooAccountSession, generation: number): Promise<boolean> {
+  private storeSession(
+    session: PersistedMooAccountSession,
+    generation: number,
+  ): Promise<{ stored: boolean; replaced: PersistedMooAccountSession | null }> {
     return this.runStorageMutation(async () => {
-      if (generation !== this.sessionGeneration) return false;
+      if (generation !== this.sessionGeneration) return { stored: false, replaced: null };
+      const current = await this.dependencies.sessionStore.get();
       await this.dependencies.sessionStore.set(session);
-      return true;
+      return {
+        stored: true,
+        replaced: current && !samePersistedSession(current, session) ? current : null,
+      };
     });
   }
 
@@ -352,8 +365,16 @@ export class MooAccountAuthController {
   }
 
   private async revokeIssuedSessionIfAllowed(session: PersistedMooAccountSession, generation: number): Promise<void> {
+    await this.revokeIssuedTokensIfAllowed(session.accessToken, session.refreshToken, generation);
+  }
+
+  private async revokeIssuedTokensIfAllowed(
+    accessToken: string,
+    refreshToken: string | undefined,
+    generation: number,
+  ): Promise<void> {
     if (generation < this.minimumCleanupRevocationGeneration) return;
-    await this.revokeSession(session).catch(() => undefined);
+    await this.revokeTokens(accessToken, refreshToken).catch(() => undefined);
   }
 
   private async assertSignInCanUseNetwork(generation: number): Promise<void> {
@@ -384,12 +405,16 @@ export class MooAccountAuthController {
   }
 
   private async revokeSession(session: PersistedMooAccountSession): Promise<void> {
+    await this.revokeTokens(session.accessToken, session.refreshToken);
+  }
+
+  private async revokeTokens(accessToken: string, refreshToken?: string): Promise<void> {
     const config = requireConfig(this.config);
     const authorizationServer = await this.authorizationServer();
     if (!authorizationServer.revocation_endpoint) return;
     const tokens = [
-      ...(session.refreshToken ? [{ token: session.refreshToken, tokenTypeHint: "refresh_token" }] : []),
-      { token: session.accessToken, tokenTypeHint: "access_token" },
+      ...(refreshToken ? [{ token: refreshToken, tokenTypeHint: "refresh_token" }] : []),
+      { token: accessToken, tokenTypeHint: "access_token" },
     ];
     await Promise.all(
       tokens.map(async ({ token, tokenTypeHint }) => {

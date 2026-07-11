@@ -78,7 +78,7 @@ const TRANSLATIONS = {
     mooAccount: "Moo Account",
     mooAccountTagline: "One optional sign-in across Moo apps.",
     mooAccountLoading: "Checking account status...",
-    mooAccountUnavailable: "Account sign-in is not configured in this build.",
+    mooAccountUnavailable: "Moo Account is temporarily unavailable. Try again.",
     mooAccountSignedOut:
       "Sign in to use supported preferences across Moo apps. MooFlights still works without an account.",
     mooAccountSignIn: "Sign in",
@@ -155,7 +155,7 @@ const TRANSLATIONS = {
     mooAccount: "Cuenta Moo",
     mooAccountTagline: "Un inicio de sesión opcional para las aplicaciones Moo.",
     mooAccountLoading: "Comprobando el estado de la cuenta...",
-    mooAccountUnavailable: "El inicio de sesión no está configurado en esta compilación.",
+    mooAccountUnavailable: "Moo Account no está disponible temporalmente. Inténtalo de nuevo.",
     mooAccountSignedOut:
       "Inicia sesión para usar preferencias compatibles en las aplicaciones Moo. MooFlights funciona también sin cuenta.",
     mooAccountSignIn: "Iniciar sesión",
@@ -231,7 +231,7 @@ const TRANSLATIONS = {
     mooAccount: "Moo 账户",
     mooAccountTagline: "一个可选登录，连接各款 Moo 应用。",
     mooAccountLoading: "正在检查账户状态...",
-    mooAccountUnavailable: "此版本未配置账户登录。",
+    mooAccountUnavailable: "Moo 账户暂时不可用，请重试。",
     mooAccountSignedOut: "登录后可在 Moo 应用间使用支持的偏好设置。无需账户也可继续使用 MooFlights。",
     mooAccountSignIn: "登录",
     mooAccountSigningIn: "正在登录...",
@@ -306,7 +306,7 @@ const TRANSLATIONS = {
     mooAccount: "Moo 帳戶",
     mooAccountTagline: "一個可選登入，連結各款 Moo 應用程式。",
     mooAccountLoading: "正在檢查帳戶狀態...",
-    mooAccountUnavailable: "此版本未設定帳戶登入。",
+    mooAccountUnavailable: "Moo 帳戶暫時無法使用，請再試一次。",
     mooAccountSignedOut: "登入後可在 Moo 應用程式間使用支援的偏好設定。無需帳戶也可繼續使用 MooFlights。",
     mooAccountSignIn: "登入",
     mooAccountSigningIn: "正在登入...",
@@ -382,7 +382,7 @@ const TRANSLATIONS = {
     mooAccount: "Moo アカウント",
     mooAccountTagline: "Moo アプリ共通の任意サインインです。",
     mooAccountLoading: "アカウントの状態を確認しています...",
-    mooAccountUnavailable: "このビルドではアカウントのサインインが設定されていません。",
+    mooAccountUnavailable: "Moo アカウントは一時的に利用できません。もう一度お試しください。",
     mooAccountSignedOut:
       "サインインすると、対応する設定を Moo アプリ間で利用できます。アカウントなしでも MooFlights は使えます。",
     mooAccountSignIn: "サインイン",
@@ -459,7 +459,7 @@ const TRANSLATIONS = {
     mooAccount: "Moo 계정",
     mooAccountTagline: "Moo 앱에서 선택적으로 사용하는 하나의 로그인입니다.",
     mooAccountLoading: "계정 상태를 확인하는 중...",
-    mooAccountUnavailable: "이 빌드에는 계정 로그인이 설정되어 있지 않습니다.",
+    mooAccountUnavailable: "Moo 계정을 일시적으로 사용할 수 없습니다. 다시 시도해 주세요.",
     mooAccountSignedOut:
       "로그인하면 지원되는 환경설정을 Moo 앱에서 사용할 수 있습니다. 계정 없이도 MooFlights를 사용할 수 있습니다.",
     mooAccountSignIn: "로그인",

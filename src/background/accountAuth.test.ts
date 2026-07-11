@@ -129,6 +129,7 @@ describe("Moo Account OIDC client", () => {
 
   it("rejects an ID Token that is not signed by the issuer JWKS", async () => {
     const store = new MemorySessionStore();
+    const requests: Request[] = [];
     let authorizationUrl: URL | undefined;
     const controller = new MooAccountAuthController(CONFIG, {
       sessionStore: store,
@@ -137,12 +138,45 @@ describe("Moo Account OIDC client", () => {
         authorizationUrl = new URL(url);
         return `${REDIRECT_URI}?code=code&state=${authorizationUrl.searchParams.get("state")}`;
       },
-      fetch: oidcFetch([], () => authorizationUrl?.searchParams.get("nonce") || "", {}, { tamperIdToken: true }),
+      fetch: oidcFetch(requests, () => authorizationUrl?.searchParams.get("nonce") || "", {}, { tamperIdToken: true }),
       now: () => NOW,
     });
 
     await expect(controller.signIn()).rejects.toThrow();
     expect(store.session).toBeNull();
+    const revokedTokens = await Promise.all(
+      requests
+        .filter((request) => request.url === `${ISSUER}/oauth2/revoke`)
+        .map(async (request) => new URLSearchParams(await request.clone().text()).get("token")),
+    );
+    expect(revokedTokens).toEqual(expect.arrayContaining(["access-token", "refresh-token"]));
+  });
+
+  it("revokes a prior stored session after replacing it with a new sign-in", async () => {
+    const store = new MemorySessionStore();
+    store.session = persistedSession({ accessToken: "old-access-token", refreshToken: "old-refresh-token" });
+    const requests: Request[] = [];
+    let authorizationUrl: URL | undefined;
+    const controller = new MooAccountAuthController(CONFIG, {
+      sessionStore: store,
+      getRedirectUrl: () => REDIRECT_URI,
+      launchWebAuthFlow: async ({ url }) => {
+        authorizationUrl = new URL(url);
+        return `${REDIRECT_URI}?code=code&state=${authorizationUrl.searchParams.get("state")}`;
+      },
+      fetch: oidcFetch(requests, () => authorizationUrl?.searchParams.get("nonce") || ""),
+      now: () => NOW,
+    });
+
+    await expect(controller.signIn()).resolves.toMatchObject({ status: "signed-in" });
+
+    const revokedTokens = await Promise.all(
+      requests
+        .filter((request) => request.url === `${ISSUER}/oauth2/revoke`)
+        .map(async (request) => new URLSearchParams(await request.clone().text()).get("token")),
+    );
+    expect(revokedTokens).toEqual(expect.arrayContaining(["old-access-token", "old-refresh-token"]));
+    expect(store.session).toMatchObject({ accessToken: "access-token", refreshToken: "refresh-token" });
   });
 
   it("requires the issuer to advertise PKCE S256", async () => {

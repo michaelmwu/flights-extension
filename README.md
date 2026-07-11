@@ -102,8 +102,9 @@ The workflow defaults to `dry_run: true`, which packages the extension and print
 The refresh token must be authorized for the `https://www.googleapis.com/auth/chromewebstore` OAuth scope.
 
 To include optional Moo Account sign-in in release packages, configure the public repository variables
-`MOOFLIGHTS_AUTH_ISSUER`, `MOOFLIGHTS_AUTH_CLIENT_ID`, and `MOOFLIGHTS_AUTH_AUDIENCE`. No Moo Account client secret is
-used or stored by the extension.
+`MOOFLIGHTS_AUTH_ISSUER`, `MOOFLIGHTS_AUTH_CLIENT_ID`, and `MOOFLIGHTS_AUTH_AUDIENCE` together. Partial
+configuration fails the package build rather than producing a partially configured extension. No Moo Account client
+secret is used or stored by the extension.
 
 By default, live submissions use `STAGED_PUBLISH`, so Chrome Web Store approval stages the update for a later manual release instead of immediately publishing it. Use `upload_only: true` to upload the package without submitting it for review.
 

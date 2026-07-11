@@ -64,5 +64,26 @@ describe("Moo Account build configuration", () => {
         MOOFLIGHTS_AUTH_AUDIENCE: "https://api.mootravel.app",
       }),
     ).toThrow("query string or fragment");
+    expect(() =>
+      resolveAuthBuildConfig({
+        MOOFLIGHTS_AUTH_ISSUER: "https://id.example.test#fragment",
+        MOOFLIGHTS_AUTH_CLIENT_ID: "mooflights-extension",
+        MOOFLIGHTS_AUTH_AUDIENCE: "https://api.mootravel.app",
+      }),
+    ).toThrow("query string or fragment");
+    expect(() =>
+      resolveAuthBuildConfig({
+        MOOFLIGHTS_AUTH_ISSUER: "https://id.example.test",
+        MOOFLIGHTS_AUTH_CLIENT_ID: "mooflights-extension",
+        MOOFLIGHTS_AUTH_AUDIENCE: "https://api.mootravel.app?resource=moo",
+      }),
+    ).toThrow("query string or fragment");
+    expect(() =>
+      resolveAuthBuildConfig({
+        MOOFLIGHTS_AUTH_ISSUER: "https://id.example.test",
+        MOOFLIGHTS_AUTH_CLIENT_ID: "mooflights-extension",
+        MOOFLIGHTS_AUTH_AUDIENCE: "https://api.mootravel.app#fragment",
+      }),
+    ).toThrow("query string or fragment");
   });
 });

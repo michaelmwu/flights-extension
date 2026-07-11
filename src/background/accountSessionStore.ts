@@ -61,7 +61,7 @@ export class IndexedDbMooAccountSessionStore implements MooAccountSessionStore {
   }
 
   private database(): Promise<IDBDatabase> {
-    this.databasePromise ||= new Promise((resolve, reject) => {
+    this.databasePromise ||= new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
       request.onupgradeneeded = () => {
         if (!request.result.objectStoreNames.contains(SESSION_STORE_NAME)) {
@@ -71,6 +71,9 @@ export class IndexedDbMooAccountSessionStore implements MooAccountSessionStore {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error || new Error("Could not open private account storage."));
       request.onblocked = () => reject(new Error("Private account storage upgrade was blocked."));
+    }).catch((error: unknown) => {
+      this.databasePromise = undefined;
+      throw error;
     });
     return this.databasePromise;
   }

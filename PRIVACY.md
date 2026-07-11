@@ -80,7 +80,7 @@ The extension requests only the permissions needed for the current feature set:
 - `identity` in account-enabled builds, for the user-initiated Moo Account browser sign-in window.
 - Host access for ITA Matrix, Google Flights, public FX-rate sources, and bundled runtime pages listed in the extension
   manifest.
-- Host access for the exact Moo Account issuer origin in account-enabled builds.
+- Host access for the Moo Account issuer host in account-enabled builds.
 
 On Firefox, account identity and profile data are optional data permissions requested only when you choose Sign in. If
 you remove either permission in Firefox settings, MooFlights clears the local account session and stops future account
