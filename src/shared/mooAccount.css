@@ -1,0 +1,107 @@
+.moo-account {
+  display: grid;
+  gap: 12px;
+  border-color: #99d5cf;
+  background: linear-gradient(145deg, #ffffff 0%, #f0fdfa 100%);
+}
+
+.moo-account-heading,
+.moo-account-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.moo-account-heading > div,
+.moo-account-profile {
+  display: grid;
+  gap: 2px;
+}
+
+.moo-account h2,
+.moo-account p {
+  margin: 0;
+}
+
+.moo-account h2 {
+  font-size: 17px;
+}
+
+.moo-account-heading p,
+.moo-account-body p,
+.moo-account-profile span,
+.moo-account-status,
+.moo-account-privacy {
+  color: #526578;
+}
+
+.moo-account-avatar {
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: #0f766e;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 750;
+}
+
+.moo-account button {
+  min-height: 36px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.moo-account button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.moo-account-primary {
+  border: 1px solid #0f766e;
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.moo-account-secondary {
+  border: 1px solid #5d8f8a;
+  background: #ffffff;
+  color: #0f766e;
+}
+
+.moo-account-error {
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fef2f2;
+  padding: 8px 10px;
+  color: #991b1b;
+}
+
+.moo-account-privacy {
+  padding-top: 10px;
+  border-top: 1px solid #cce8e4;
+  font-size: 12px;
+}
+
+.moo-account.compact {
+  gap: 10px;
+}
+
+.moo-account.compact .moo-account-heading,
+.moo-account.compact .moo-account-body {
+  align-items: flex-start;
+}
+
+.moo-account.compact .moo-account-body {
+  display: grid;
+}
+
+.moo-account.compact button {
+  width: 100%;
+}

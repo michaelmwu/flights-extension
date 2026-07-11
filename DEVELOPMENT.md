@@ -36,6 +36,40 @@ bun run build:dev
 
 Dev builds expose an options-page "Developer Backend" section for pointing the extension at a locally running API such as `http://localhost:3000`. Production builds hide this section.
 
+## Moo Account Builds
+
+Account support is disabled when all account variables are absent. A partial configuration fails the build so a release
+cannot silently ship a mismatched issuer or client:
+
+```sh
+MOOFLIGHTS_AUTH_ISSUER=https://id.michaelmwu.com \
+MOOFLIGHTS_AUTH_CLIENT_ID=mooflights-extension-dev \
+MOOFLIGHTS_AUTH_AUDIENCE=https://api.mootravel.app \
+bun run build:dev
+```
+
+Production issuer and audience URLs must use HTTPS. Dev builds also accept HTTP loopback URLs, which allows a local
+identity service without coupling ordinary extension work to it:
+
+```sh
+MOOFLIGHTS_AUTH_ISSUER=http://127.0.0.1:4310 \
+MOOFLIGHTS_AUTH_CLIENT_ID=mooflights-extension-local \
+MOOFLIGHTS_AUTH_AUDIENCE=http://localhost:48731 \
+bun run build:dev
+```
+
+Register the exact value returned by `chrome.identity.getRedirectURL("moo-account")` for each production/development
+extension identity. Chrome and Firefox use different redirect origins. Account clients are public: never add a client
+secret to a build variable, manifest, source file, or extension setting.
+
+Account-enabled Firefox builds require Firefox 140 or later and declare `authenticationInfo` and
+`personallyIdentifyingInfo` as optional data-collection permissions. Firefox requests those permissions only when the
+user chooses Sign in. Account-disabled Firefox builds keep the existing Firefox 107 minimum and declare no data
+collection.
+
+Release and Chrome Web Store workflows read the three public values from repository variables with the same names. If
+all three variables are unset, packages remain account-disabled; if only some are set, packaging fails closed.
+
 For Firefox:
 
 ```sh
@@ -125,7 +159,8 @@ LLC has the relevant store automation credentials, store submission and Mozilla 
 GitHub Actions. The Firefox XPI attached to GitHub releases is unsigned and intended for Mozilla Add-ons submission or
 developer testing.
 
-Neither workflow needs backend secrets. The extension build must not read `.env`.
+Neither workflow needs backend secrets. The extension build must not read `.env`. Release workflows that enable Moo
+Account need only the non-secret issuer, public client ID, and resource audience values.
 
 ## Stable Unpacked Extension Path
 

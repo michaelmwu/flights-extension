@@ -44,6 +44,9 @@ jobs:
     timeout-minutes: 10
     env:
       RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
+      MOOFLIGHTS_AUTH_ISSUER: ${{ vars.MOOFLIGHTS_AUTH_ISSUER }}
+      MOOFLIGHTS_AUTH_CLIENT_ID: ${{ vars.MOOFLIGHTS_AUTH_CLIENT_ID }}
+      MOOFLIGHTS_AUTH_AUDIENCE: ${{ vars.MOOFLIGHTS_AUTH_AUDIENCE }}
 
     steps:
       - name: Checkout

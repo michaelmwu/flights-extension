@@ -75,6 +75,18 @@ const TRANSLATIONS = {
     openItaMatrix: "Open ITA Matrix",
     options: "Options",
     optionsPageTitle: "MooFlights Options",
+    mooAccount: "Moo Account",
+    mooAccountTagline: "One optional sign-in across Moo apps.",
+    mooAccountLoading: "Checking account status...",
+    mooAccountUnavailable: "Moo Account is temporarily unavailable. Try again.",
+    mooAccountSignedOut:
+      "Sign in to use supported preferences across Moo apps. MooFlights still works without an account.",
+    mooAccountSignIn: "Sign in",
+    mooAccountSigningIn: "Signing in...",
+    mooAccountSignOut: "Sign out",
+    mooAccountSigningOut: "Signing out...",
+    mooAccountPrivacy:
+      "Signing in shares your Moo Account identity (such as name and email) with this extension. It does not share flight searches or itineraries or enable Community Intelligence.",
     developerBackend: "Developer Backend",
     developerBackendNote:
       "Dev-build-only controls for pointing the extension at a locally running MooTravel API. This is an HTTPS/API boundary, not direct database access.",
@@ -140,6 +152,18 @@ const TRANSLATIONS = {
     openItaMatrix: "Abrir ITA Matrix",
     options: "Opciones",
     optionsPageTitle: "Opciones de MooFlights",
+    mooAccount: "Cuenta Moo",
+    mooAccountTagline: "Un inicio de sesión opcional para las aplicaciones Moo.",
+    mooAccountLoading: "Comprobando el estado de la cuenta...",
+    mooAccountUnavailable: "Moo Account no está disponible temporalmente. Inténtalo de nuevo.",
+    mooAccountSignedOut:
+      "Inicia sesión para usar preferencias compatibles en las aplicaciones Moo. MooFlights funciona también sin cuenta.",
+    mooAccountSignIn: "Iniciar sesión",
+    mooAccountSigningIn: "Iniciando sesión...",
+    mooAccountSignOut: "Cerrar sesión",
+    mooAccountSigningOut: "Cerrando sesión...",
+    mooAccountPrivacy:
+      "Al iniciar sesión, compartes tu identidad de Moo Account (como nombre y correo electrónico) con esta extensión. No comparte búsquedas de vuelos ni itinerarios, ni activa Community Intelligence.",
     developerBackend: "Backend de desarrollo",
     developerBackendNote:
       "Controles solo para builds de desarrollo que apuntan la extensión a una API local de MooTravel. Es un límite HTTPS/API, no acceso directo a la base de datos.",
@@ -204,6 +228,17 @@ const TRANSLATIONS = {
     openItaMatrix: "打开 ITA Matrix",
     options: "选项",
     optionsPageTitle: "MooFlights 选项",
+    mooAccount: "Moo 账户",
+    mooAccountTagline: "一个可选登录，连接各款 Moo 应用。",
+    mooAccountLoading: "正在检查账户状态...",
+    mooAccountUnavailable: "Moo 账户暂时不可用，请重试。",
+    mooAccountSignedOut: "登录后可在 Moo 应用间使用支持的偏好设置。无需账户也可继续使用 MooFlights。",
+    mooAccountSignIn: "登录",
+    mooAccountSigningIn: "正在登录...",
+    mooAccountSignOut: "退出登录",
+    mooAccountSigningOut: "正在退出...",
+    mooAccountPrivacy:
+      "登录会与此扩展共享您的 Moo Account 身份信息（例如姓名和电子邮箱），但不会共享航班搜索或行程，也不会启用 Community Intelligence。",
     developerBackend: "开发后端",
     developerBackendNote:
       "仅开发构建使用的控件，用于将扩展指向本地运行的 MooTravel API。这是 HTTPS/API 边界，不是直接数据库访问。",
@@ -268,6 +303,17 @@ const TRANSLATIONS = {
     openItaMatrix: "開啟 ITA Matrix",
     options: "選項",
     optionsPageTitle: "MooFlights 選項",
+    mooAccount: "Moo 帳戶",
+    mooAccountTagline: "一個可選登入，連結各款 Moo 應用程式。",
+    mooAccountLoading: "正在檢查帳戶狀態...",
+    mooAccountUnavailable: "Moo 帳戶暫時無法使用，請再試一次。",
+    mooAccountSignedOut: "登入後可在 Moo 應用程式間使用支援的偏好設定。無需帳戶也可繼續使用 MooFlights。",
+    mooAccountSignIn: "登入",
+    mooAccountSigningIn: "正在登入...",
+    mooAccountSignOut: "登出",
+    mooAccountSigningOut: "正在登出...",
+    mooAccountPrivacy:
+      "登入會與此擴充功能分享您的 Moo Account 身分資訊（例如姓名和電子郵件），但不會分享航班搜尋或行程，也不會啟用 Community Intelligence。",
     developerBackend: "開發後端",
     developerBackendNote:
       "僅開發建置使用的控制項，用於將擴充功能指向本機執行的 MooTravel API。這是 HTTPS/API 邊界，不是直接資料庫存取。",
@@ -333,6 +379,18 @@ const TRANSLATIONS = {
     openItaMatrix: "ITA Matrix を開く",
     options: "オプション",
     optionsPageTitle: "MooFlights オプション",
+    mooAccount: "Moo アカウント",
+    mooAccountTagline: "Moo アプリ共通の任意サインインです。",
+    mooAccountLoading: "アカウントの状態を確認しています...",
+    mooAccountUnavailable: "Moo アカウントは一時的に利用できません。もう一度お試しください。",
+    mooAccountSignedOut:
+      "サインインすると、対応する設定を Moo アプリ間で利用できます。アカウントなしでも MooFlights は使えます。",
+    mooAccountSignIn: "サインイン",
+    mooAccountSigningIn: "サインイン中...",
+    mooAccountSignOut: "サインアウト",
+    mooAccountSigningOut: "サインアウト中...",
+    mooAccountPrivacy:
+      "サインインすると、Moo Account の本人情報（氏名やメールアドレスなど）がこの拡張機能に共有されます。フライト検索や旅程は共有されず、Community Intelligence も有効になりません。",
     developerBackend: "開発用バックエンド",
     developerBackendNote:
       "ローカルで実行中の MooTravel API に拡張機能を向ける、開発ビルド専用の設定です。これは HTTPS/API の境界であり、データベースへの直接アクセスではありません。",
@@ -398,6 +456,18 @@ const TRANSLATIONS = {
     openItaMatrix: "ITA Matrix 열기",
     options: "옵션",
     optionsPageTitle: "MooFlights 옵션",
+    mooAccount: "Moo 계정",
+    mooAccountTagline: "Moo 앱에서 선택적으로 사용하는 하나의 로그인입니다.",
+    mooAccountLoading: "계정 상태를 확인하는 중...",
+    mooAccountUnavailable: "Moo 계정을 일시적으로 사용할 수 없습니다. 다시 시도해 주세요.",
+    mooAccountSignedOut:
+      "로그인하면 지원되는 환경설정을 Moo 앱에서 사용할 수 있습니다. 계정 없이도 MooFlights를 사용할 수 있습니다.",
+    mooAccountSignIn: "로그인",
+    mooAccountSigningIn: "로그인 중...",
+    mooAccountSignOut: "로그아웃",
+    mooAccountSigningOut: "로그아웃 중...",
+    mooAccountPrivacy:
+      "로그인하면 Moo Account 신원 정보(이름, 이메일 주소 등)가 이 확장 프로그램과 공유됩니다. 항공편 검색이나 여정은 공유되지 않으며 Community Intelligence가 활성화되지 않습니다.",
     developerBackend: "개발 백엔드",
     developerBackendNote:
       "로컬에서 실행 중인 MooTravel API를 확장 프로그램에 연결하기 위한 개발 빌드 전용 설정입니다. 이는 HTTPS/API 경계이며 직접 데이터베이스 액세스가 아닙니다.",

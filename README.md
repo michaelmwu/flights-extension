@@ -9,6 +9,7 @@ It helps with:
 - Open prefilled Where to Credit links for fare-class lookup.
 - Rank curated booking links by local confidence.
 - Filter and insert airport codes on ITA search pages.
+- Optionally connect a shared Moo Account without making core flight tools depend on a hosted service.
 
 The extension is AGPL-3.0-only open-source software owned by Mu Travel LLC. The optional hosted MooTravel backend is separate closed-source infrastructure.
 
@@ -99,6 +100,11 @@ The workflow defaults to `dry_run: true`, which packages the extension and print
 - `CHROME_WEBSTORE_EXTENSION_ID`
 
 The refresh token must be authorized for the `https://www.googleapis.com/auth/chromewebstore` OAuth scope.
+
+To include optional Moo Account sign-in in release packages, configure the public repository variables
+`MOOFLIGHTS_AUTH_ISSUER`, `MOOFLIGHTS_AUTH_CLIENT_ID`, and `MOOFLIGHTS_AUTH_AUDIENCE` together. Partial
+configuration fails the package build rather than producing a partially configured extension. No Moo Account client
+secret is used or stored by the extension.
 
 By default, live submissions use `STAGED_PUBLISH`, so Chrome Web Store approval stages the update for a later manual release instead of immediately publishing it. Use `upload_only: true` to upload the package without submitting it for review.
 

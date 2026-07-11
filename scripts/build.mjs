@@ -3,6 +3,7 @@ import { copyFile, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { promisify } from "node:util";
 import esbuild from "esbuild";
+import { authIssuerHostPermission, resolveAuthBuildConfig } from "./auth-build-config.mjs";
 import { browserTarget } from "./browser-target.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -12,6 +13,7 @@ const browser = browserTarget();
 const stableDist = process.argv.includes("--stable-dist") || process.env.MOOFLIGHTS_STABLE_EXTENSION_DIST === "1";
 const dist = await distPath();
 const devBuild = watch || process.argv.includes("--dev") || process.env.MOOFLIGHTS_DEV_BUILD === "1";
+const accountAuth = resolveAuthBuildConfig(process.env, { devBuild });
 
 const entries = [
   {
@@ -73,6 +75,10 @@ async function buildEntry(entry) {
     define: {
       "process.env.NODE_ENV": JSON.stringify(devBuild ? "development" : "production"),
       __MOOFLIGHTS_DEV_BUILD__: JSON.stringify(devBuild),
+      __MOOFLIGHTS_AUTH_ENABLED__: JSON.stringify(accountAuth.enabled),
+      __MOOFLIGHTS_AUTH_ISSUER__: JSON.stringify(accountAuth.issuer),
+      __MOOFLIGHTS_AUTH_CLIENT_ID__: JSON.stringify(accountAuth.clientId),
+      __MOOFLIGHTS_AUTH_AUDIENCE__: JSON.stringify(accountAuth.audience),
     },
   };
 }
@@ -124,8 +130,10 @@ function applyBrowserManifest(manifest) {
   const skyscannerWebAccessibleMatches = skyscannerTransportMatches.map(skyscannerWebAccessibleMatch);
   addSkyscannerMatchesToGeneratedManifest(manifest, skyscannerTransportMatches);
 
+  const issuerHostPermission = authIssuerHostPermission(accountAuth);
   const hostPermissions = unique([
     ...(manifest.host_permissions || []),
+    ...(issuerHostPermission ? [issuerHostPermission] : []),
     ...(devBuild ? ["http://localhost/*", "http://127.0.0.1/*"] : []),
   ]);
   const webAccessibleResources = [
@@ -160,6 +168,7 @@ function applyBrowserManifest(manifest) {
   ];
 
   manifest.host_permissions = hostPermissions;
+  manifest.permissions = unique([...(manifest.permissions || []), ...(accountAuth.enabled ? ["identity"] : [])]);
   manifest.web_accessible_resources = webAccessibleResources;
 
   if (browser !== "firefox") return;
@@ -184,10 +193,14 @@ function applyBrowserManifest(manifest) {
   manifest.browser_specific_settings = {
     gecko: {
       id: "extension@mooflights.com",
-      data_collection_permissions: {
-        required: ["none"],
-      },
-      strict_min_version: "107.0",
+      data_collection_permissions: accountAuth.enabled
+        ? {
+            optional: ["authenticationInfo", "personallyIdentifyingInfo"],
+          }
+        : {
+            required: ["none"],
+          },
+      strict_min_version: accountAuth.enabled ? "140.0" : "107.0",
     },
   };
 }

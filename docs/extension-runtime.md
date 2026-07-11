@@ -15,6 +15,12 @@ Both generated manifests request:
 - required host access for daily cached public USD FX rates from `https://cdn.jsdelivr.net/*` and
   `https://api.fxratesapi.com/*`
 
+When all three Moo Account build variables are present, the generated manifest additionally requests `identity` and
+host access for only the configured OIDC issuer origin. The API resource audience is not a host permission.
+On Firefox, account-enabled builds also require Firefox 140 or later and list account authentication/profile data as
+optional data collection; the extension requests consent only when the user clicks Sign in. Account-disabled Firefox
+builds retain the Firefox 107 minimum and `none` declaration.
+
 The Firefox build also requests `tabs` because its background script reads active tab URLs while coordinating ITA Matrix
 auto-open handoffs.
 
@@ -49,15 +55,19 @@ injects the visible panel on booking pages and on ITA Matrix handoff itinerary p
 
 `src/background/serviceWorker.ts` is bundled as the Chrome MV3 service worker and as the Firefox MV2 event-page
 background script. It runs the country checks with bounded concurrency, retries sparse country results once when the
-baseline page is dense, and closes temporary tabs after parsing.
+baseline page is dense, and closes temporary tabs after parsing. In an account-enabled build it also owns the public
+OIDC client, launches user-initiated browser auth, persists private credentials in extension-origin IndexedDB, refreshes
+expiring sessions, and best-effort revokes credentials on sign-out. Account runtime messages are accepted only from
+trusted popup/options extension pages.
 
 ## Popup
 
-`src/popup/` shows quick status and links to ITA Matrix/options.
+`src/popup/` shows quick status, optional Moo Account state, and links to ITA Matrix/options.
 
 ## Options
 
-`src/options/` manages local settings.
+`src/options/` manages local settings and the optional Moo Account connection. Signing in does not change local privacy
+or Community Intelligence settings.
 
 ## Shared Modules
 
@@ -66,6 +76,7 @@ baseline page is dense, and closes temporary tabs after parsing.
 - `airports.ts`: airport filtering helpers.
 - `storage.ts`: settings defaults and persistence.
 - `backendClient.ts`: optional hosted metadata client with silent fallback.
+- `accountMessages.ts`: token-free account UI state and typed trusted-page runtime contracts.
 - `currencyRates.ts`: public USD FX-rate fetch/cache helper for approximate revenue-based mileage conversion.
 - `mileageEarnings.ts`: compact offline earnings estimates plus outbound Where to Credit link helpers.
 

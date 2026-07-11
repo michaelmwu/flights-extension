@@ -40,6 +40,9 @@ jobs:
     timeout-minutes: 15
     env:
       RELEASE_TAG: ${{ inputs.release_tag }}
+      MOOFLIGHTS_AUTH_ISSUER: ${{ vars.MOOFLIGHTS_AUTH_ISSUER }}
+      MOOFLIGHTS_AUTH_CLIENT_ID: ${{ vars.MOOFLIGHTS_AUTH_CLIENT_ID }}
+      MOOFLIGHTS_AUTH_AUDIENCE: ${{ vars.MOOFLIGHTS_AUTH_AUDIENCE }}
 
     steps:
       - name: Checkout

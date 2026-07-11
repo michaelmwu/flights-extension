@@ -1,6 +1,17 @@
 import "../shared/firefoxChromeCompat";
+import {
+  hasMooAccountDataConsent,
+  isMooAccountRequest,
+  isTrustedMooAccountSender,
+  type MooAccountRequest,
+  type MooAccountResponse,
+  removesMooAccountDataConsent,
+  unavailableMooAccountState,
+} from "../shared/accountMessages";
 import { type CountryResult, countryComparisonUrl, type SearchCountryResult } from "../shared/countryComparison";
 import type { RemoteProviderMetadata } from "../shared/types";
+import { compiledMooAccountAuthConfig, MooAccountAuthController, publicAccountError } from "./accountAuth";
+import { IndexedDbMooAccountSessionStore } from "./accountSessionStore";
 
 type RuntimeMessage = {
   command?: string;
@@ -30,6 +41,21 @@ const MATRIX_AUTO_OPEN_TTL_MS = 5 * 60 * 1000;
 let tabCreateQueue = Promise.resolve();
 let lastTabCreatedAt = 0;
 
+const mooAccountController = new MooAccountAuthController(compiledMooAccountAuthConfig(), {
+  sessionStore: new IndexedDbMooAccountSessionStore(),
+  launchWebAuthFlow: (details) => chrome.identity.launchWebAuthFlow(details),
+  getRedirectUrl: () => chrome.identity.getRedirectURL("moo-account"),
+  fetch: globalThis.fetch.bind(globalThis),
+  hasDataConsent: hasMooAccountDataConsent,
+});
+void mooAccountController.initialize().catch(() => undefined);
+
+chrome.permissions.onRemoved.addListener((permissions) => {
+  if (removesMooAccountDataConsent(permissions)) {
+    void mooAccountController.forgetSession().catch(() => undefined);
+  }
+});
+
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") {
     openOptionsPage();
@@ -37,6 +63,24 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
+  if (isMooAccountRequest(message)) {
+    if (!isTrustedMooAccountSender(sender, chrome.runtime.id, chrome.runtime.getURL("/"))) {
+      const response: MooAccountResponse = {
+        ok: false,
+        state: unavailableMooAccountState(),
+        error: {
+          code: "not_allowed",
+          message: "Moo Account commands are available only to trusted extension pages.",
+        },
+      };
+      sendResponse(response);
+      return false;
+    }
+
+    void handleMooAccountRequest(message).then(sendResponse);
+    return true;
+  }
+
   const payload = message as RuntimeMessage;
   if (payload.command === "openOptionsPage") {
     openOptionsPage();
@@ -113,6 +157,35 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
     .catch(() => sendResponse({ providers: [] }));
   return true;
 });
+
+async function handleMooAccountRequest(request: MooAccountRequest): Promise<MooAccountResponse> {
+  try {
+    if (!(await hasMooAccountDataConsent())) {
+      const state = await mooAccountController.forgetSession();
+      if (request.command === "mooAccount:signIn") {
+        return {
+          ok: false,
+          state,
+          error: {
+            code: "not_allowed",
+            message: "Moo Account sign-in needs permission to share account identity data.",
+          },
+        };
+      }
+      return { ok: true, state };
+    }
+    const state =
+      request.command === "mooAccount:signIn"
+        ? await mooAccountController.signIn()
+        : request.command === "mooAccount:signOut"
+          ? await mooAccountController.signOut()
+          : await mooAccountController.getState();
+    return { ok: true, state };
+  } catch (error) {
+    const state = await mooAccountController.getState().catch(unavailableMooAccountState);
+    return { ok: false, state, error: publicAccountError(error) };
+  }
+}
 
 async function compareGoogleFlightsCountries(payload: RuntimeMessage, progressTabId?: number): Promise<void> {
   const baseUrl = payload.baseUrl || "";
