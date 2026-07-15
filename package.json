@@ -37,22 +37,22 @@
     "webstore:submit": "node scripts/submit-chrome-webstore.mjs"
   },
   "dependencies": {
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
+    "@biomejs/biome": "^2.4.16",
     "@playwright/test": "^1.60.0",
     "@types/chrome": "^0.1.34",
-    "@types/node": "^25.0.3",
-    "@types/react": "^19.2.7",
+    "@types/node": "^25.9.2",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "esbuild": "^0.28.0",
     "jsdom": "^29.1.1",
     "rimraf": "^6.1.2",
     "typescript": "^6.0.3",
-    "vite": "^8.0.14",
+    "vite": "^8.0.16",
     "vitest": "^4.0.16"
   }
 }
