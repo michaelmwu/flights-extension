@@ -19,6 +19,8 @@ const CONTENT_TRANSLATIONS = {
     noVisibleGoogleFlightsRows: "No visible Google Flights result rows found yet.",
     noSkyscannerSearchApiResponse: "No Skyscanner search API response captured yet. Reload the page and try again.",
     checking: "Checking...",
+    stopChecking: "Stop",
+    stopping: "Stopping…",
     countries: "Countries",
     selectedShort: "{count} selected",
     comparedShort: "{count} compared",
@@ -35,6 +37,7 @@ const CONTENT_TRANSLATIONS = {
     justNow: "just now",
     minutesAgo: "{count} min ago",
     countriesChecked: "{completed} of {total} countries checked.",
+    partialCountryComparison: "Stopped after {completed} of {total} countries. Partial results shown.",
     allUsefulCountriesNotice:
       "All useful countries excludes unsupported and not-useful markets. Large checks can take a long time.",
     largeCountrySelectionNotice:
@@ -138,6 +141,8 @@ const CONTENT_TRANSLATIONS = {
     noSkyscannerSearchApiResponse:
       "Aún no se capturó una respuesta de la API de búsqueda de Skyscanner. Recarga la página e inténtalo de nuevo.",
     checking: "Comprobando...",
+    stopChecking: "Detener",
+    stopping: "Deteniendo…",
     countries: "Países",
     selectedShort: "{count} seleccionados",
     comparedShort: "{count} comparados",
@@ -155,6 +160,8 @@ const CONTENT_TRANSLATIONS = {
     justNow: "ahora mismo",
     minutesAgo: "hace {count} min",
     countriesChecked: "{completed} de {total} países comprobados.",
+    partialCountryComparison:
+      "Se detuvo después de revisar {completed} de {total} países. Se muestran resultados parciales.",
     allUsefulCountriesNotice:
       "Todos útiles excluye mercados no admitidos o poco útiles. Las comprobaciones grandes pueden tardar bastante.",
     largeCountrySelectionNotice:
@@ -258,6 +265,8 @@ const CONTENT_TRANSLATIONS = {
     noVisibleGoogleFlightsRows: "尚未找到可见的 Google Flights 结果。",
     noSkyscannerSearchApiResponse: "尚未捕获 Skyscanner 搜索 API 响应。请重新加载页面后重试。",
     checking: "正在检查...",
+    stopChecking: "停止",
+    stopping: "正在停止…",
     countries: "国家/地区",
     selectedShort: "已选 {count} 个",
     comparedShort: "比较 {count} 个",
@@ -274,6 +283,7 @@ const CONTENT_TRANSLATIONS = {
     justNow: "刚刚",
     minutesAgo: "{count} 分钟前",
     countriesChecked: "已检查 {completed}/{total} 个国家/地区。",
+    partialCountryComparison: "已在检查 {completed}/{total} 个国家/地区后停止。显示部分结果。",
     allUsefulCountriesNotice: "所有实用会排除不支持或不实用的市场。大量检查可能需要较长时间。",
     largeCountrySelectionNotice: "大量国家/地区选择可能需要较长时间。每个国家/地区完成后会显示结果。",
     milesEarning: "里程累积",
@@ -373,6 +383,8 @@ const CONTENT_TRANSLATIONS = {
     noVisibleGoogleFlightsRows: "尚未找到可見的 Google Flights 結果。",
     noSkyscannerSearchApiResponse: "尚未擷取 Skyscanner 搜尋 API 回應。請重新載入頁面後再試一次。",
     checking: "正在檢查...",
+    stopChecking: "停止",
+    stopping: "正在停止…",
     countries: "國家/地區",
     selectedShort: "已選 {count} 個",
     comparedShort: "比較 {count} 個",
@@ -389,6 +401,7 @@ const CONTENT_TRANSLATIONS = {
     justNow: "剛剛",
     minutesAgo: "{count} 分鐘前",
     countriesChecked: "已檢查 {completed}/{total} 個國家/地區。",
+    partialCountryComparison: "已在檢查 {completed}/{total} 個國家/地區後停止。顯示部分結果。",
     allUsefulCountriesNotice: "所有實用會排除不支援或不實用的市場。大量檢查可能需要較長時間。",
     largeCountrySelectionNotice: "大量國家/地區選擇可能需要較長時間。每個國家/地區完成後會顯示結果。",
     milesEarning: "哩程累積",
@@ -489,6 +502,8 @@ const CONTENT_TRANSLATIONS = {
     noSkyscannerSearchApiResponse:
       "Skyscanner 検索 API のレスポンスはまだ取得されていません。ページを再読み込みしてもう一度お試しください。",
     checking: "確認中...",
+    stopChecking: "停止",
+    stopping: "停止中…",
     countries: "国",
     selectedShort: "{count} 件選択中",
     comparedShort: "{count} 件を比較",
@@ -506,6 +521,7 @@ const CONTENT_TRANSLATIONS = {
     justNow: "たった今",
     minutesAgo: "{count} 分前",
     countriesChecked: "{total} か国中 {completed} か国を確認済み。",
+    partialCountryComparison: "{total}か国中{completed}か国を確認して停止しました。部分的な結果を表示しています。",
     allUsefulCountriesNotice:
       "有用な国すべて、は未対応または有用性の低い市場を除外します。大量チェックは時間がかかる場合があります。",
     largeCountrySelectionNotice:
@@ -610,6 +626,8 @@ const CONTENT_TRANSLATIONS = {
     noSkyscannerSearchApiResponse:
       "아직 Skyscanner 검색 API 응답을 캡처하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도하세요.",
     checking: "확인 중...",
+    stopChecking: "중지",
+    stopping: "중지하는 중…",
     countries: "국가",
     selectedShort: "{count}개 선택됨",
     comparedShort: "{count}개 비교",
@@ -626,6 +644,7 @@ const CONTENT_TRANSLATIONS = {
     justNow: "방금",
     minutesAgo: "{count}분 전",
     countriesChecked: "{total}개 국가 중 {completed}개 확인됨.",
+    partialCountryComparison: "{total}개 국가 중 {completed}개 국가를 확인한 후 중지했습니다. 부분 결과를 표시합니다.",
     allUsefulCountriesNotice:
       "유용한 모든 국가는 지원되지 않거나 유용하지 않은 시장을 제외합니다. 큰 검사는 오래 걸릴 수 있습니다.",
     largeCountrySelectionNotice: "국가 선택이 많으면 오래 걸릴 수 있습니다. 각 국가가 끝날 때마다 결과가 표시됩니다.",
