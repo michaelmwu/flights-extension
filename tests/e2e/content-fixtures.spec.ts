@@ -646,6 +646,59 @@ test("renders Google Flights cached country comparison prices on routed booking 
   await expect(panel.getByText(/2 option\(s\)/)).toHaveCount(3);
 });
 
+test("keeps the Google Flights panel scroll position while comparison results arrive", async ({
+  context,
+  extensionServiceWorker,
+  page,
+}) => {
+  const pageUrl = "https://www.google.com/travel/flights/booking?tfs=e2e-fixture&curr=USD&gl=US";
+  await setGoogleFlightsCachedResults(extensionServiceWorker, pageUrl);
+  await routeGoogleFlightsBookingFixtures(context);
+
+  await page.goto(pageUrl);
+
+  const panel = page.locator("#mooflights-google-flights-panel");
+  await expect(panel.getByText("South Africa", { exact: true })).toBeVisible();
+  const comparisonTabsPromise = Promise.all(["CA", "ZA"].map((country) => waitForComparisonTab(context, country)));
+  await panel.getByRole("button", { name: "Compare (3)" }).click();
+  await expect(panel.getByRole("button", { name: "Checking..." })).toBeVisible();
+
+  const initialScroll = await panel.evaluate((host) => {
+    const shadow = host.shadowRoot;
+    const panelElement = shadow?.querySelector<HTMLElement>(".panel");
+    const anchor = panelElement?.querySelector<HTMLElement>(".country-chip");
+    if (!shadow || !panelElement || !anchor) throw new Error("MooFlights panel was not rendered.");
+
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(".panel { max-height: 140px !important; }");
+    shadow.adoptedStyleSheets = [...shadow.adoptedStyleSheets, sheet];
+    panelElement.scrollTop = 80;
+    return {
+      anchorTop: anchor.getBoundingClientRect().top - panelElement.getBoundingClientRect().top,
+      clientHeight: panelElement.clientHeight,
+      scrollHeight: panelElement.scrollHeight,
+      scrollTop: panelElement.scrollTop,
+    };
+  });
+  expect(initialScroll.scrollHeight).toBeGreaterThan(initialScroll.clientHeight);
+  expect(initialScroll.scrollTop).toBeGreaterThan(0);
+
+  await comparisonTabsPromise;
+  await expect(panel.getByText("Cached country comparison from just now.")).toBeVisible({ timeout: 20_000 });
+
+  const finalScroll = await panel.evaluate((host) => {
+    const panelElement = host.shadowRoot?.querySelector<HTMLElement>(".panel");
+    const anchor = panelElement?.querySelector<HTMLElement>(".country-chip");
+    if (!panelElement || !anchor) throw new Error("MooFlights panel was not rendered.");
+    return {
+      anchorTop: anchor.getBoundingClientRect().top - panelElement.getBoundingClientRect().top,
+      scrollTop: panelElement.scrollTop,
+    };
+  });
+  expect(finalScroll.anchorTop).toBeCloseTo(initialScroll.anchorTop, 0);
+  expect(finalScroll.scrollTop).toBe(initialScroll.scrollTop);
+});
+
 async function routeOptionalExtensionNetwork(context: BrowserContext): Promise<void> {
   const fixtureDate = new Date().toISOString().slice(0, 10);
   await context.route("https://cdn.jsdelivr.net/**", async (route) => {
