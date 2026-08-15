@@ -659,16 +659,22 @@ test("keeps the Google Flights panel scroll position while comparison results ar
 
   const panel = page.locator("#mooflights-google-flights-panel");
   await expect(panel.getByText("South Africa", { exact: true })).toBeVisible();
+  const comparisonTabsPromise = Promise.all(["CA", "ZA"].map((country) => waitForComparisonTab(context, country)));
+  await panel.getByRole("button", { name: "Compare (3)" }).click();
+  await expect(panel.getByRole("button", { name: "Checking..." })).toBeVisible();
+
   const initialScroll = await panel.evaluate((host) => {
     const shadow = host.shadowRoot;
     const panelElement = shadow?.querySelector<HTMLElement>(".panel");
-    if (!shadow || !panelElement) throw new Error("MooFlights panel was not rendered.");
+    const anchor = panelElement?.querySelector<HTMLElement>(".country-chip");
+    if (!shadow || !panelElement || !anchor) throw new Error("MooFlights panel was not rendered.");
 
     const sheet = new CSSStyleSheet();
     sheet.replaceSync(".panel { max-height: 140px !important; }");
     shadow.adoptedStyleSheets = [...shadow.adoptedStyleSheets, sheet];
     panelElement.scrollTop = 80;
     return {
+      anchorTop: anchor.getBoundingClientRect().top - panelElement.getBoundingClientRect().top,
       clientHeight: panelElement.clientHeight,
       scrollHeight: panelElement.scrollHeight,
       scrollTop: panelElement.scrollTop,
@@ -677,13 +683,20 @@ test("keeps the Google Flights panel scroll position while comparison results ar
   expect(initialScroll.scrollHeight).toBeGreaterThan(initialScroll.clientHeight);
   expect(initialScroll.scrollTop).toBeGreaterThan(0);
 
-  const comparisonTabsPromise = Promise.all(["CA", "ZA"].map((country) => waitForComparisonTab(context, country)));
-  await panel.getByRole("button", { name: "Compare (3)" }).click();
   await comparisonTabsPromise;
   await expect(panel.getByText("Cached country comparison from just now.")).toBeVisible({ timeout: 20_000 });
 
-  const scrollTop = await panel.evaluate((host) => host.shadowRoot?.querySelector<HTMLElement>(".panel")?.scrollTop);
-  expect(scrollTop).toBeGreaterThan(0);
+  const finalScroll = await panel.evaluate((host) => {
+    const panelElement = host.shadowRoot?.querySelector<HTMLElement>(".panel");
+    const anchor = panelElement?.querySelector<HTMLElement>(".country-chip");
+    if (!panelElement || !anchor) throw new Error("MooFlights panel was not rendered.");
+    return {
+      anchorTop: anchor.getBoundingClientRect().top - panelElement.getBoundingClientRect().top,
+      scrollTop: panelElement.scrollTop,
+    };
+  });
+  expect(finalScroll.anchorTop).toBeCloseTo(initialScroll.anchorTop, 0);
+  expect(finalScroll.scrollTop).toBe(initialScroll.scrollTop);
 });
 
 async function routeOptionalExtensionNetwork(context: BrowserContext): Promise<void> {
