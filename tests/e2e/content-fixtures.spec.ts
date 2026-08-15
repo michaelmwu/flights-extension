@@ -646,6 +646,46 @@ test("renders Google Flights cached country comparison prices on routed booking 
   await expect(panel.getByText(/2 option\(s\)/)).toHaveCount(3);
 });
 
+test("keeps the Google Flights panel scroll position while comparison results arrive", async ({
+  context,
+  extensionServiceWorker,
+  page,
+}) => {
+  const pageUrl = "https://www.google.com/travel/flights/booking?tfs=e2e-fixture&curr=USD&gl=US";
+  await setGoogleFlightsCachedResults(extensionServiceWorker, pageUrl);
+  await routeGoogleFlightsBookingFixtures(context);
+
+  await page.goto(pageUrl);
+
+  const panel = page.locator("#mooflights-google-flights-panel");
+  await expect(panel.getByText("South Africa", { exact: true })).toBeVisible();
+  const initialScroll = await panel.evaluate((host) => {
+    const shadow = host.shadowRoot;
+    const panelElement = shadow?.querySelector<HTMLElement>(".panel");
+    if (!shadow || !panelElement) throw new Error("MooFlights panel was not rendered.");
+
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(".panel { max-height: 140px !important; }");
+    shadow.adoptedStyleSheets = [...shadow.adoptedStyleSheets, sheet];
+    panelElement.scrollTop = 80;
+    return {
+      clientHeight: panelElement.clientHeight,
+      scrollHeight: panelElement.scrollHeight,
+      scrollTop: panelElement.scrollTop,
+    };
+  });
+  expect(initialScroll.scrollHeight).toBeGreaterThan(initialScroll.clientHeight);
+  expect(initialScroll.scrollTop).toBeGreaterThan(0);
+
+  const comparisonTabsPromise = Promise.all(["CA", "ZA"].map((country) => waitForComparisonTab(context, country)));
+  await panel.getByRole("button", { name: "Compare (3)" }).click();
+  await comparisonTabsPromise;
+  await expect(panel.getByText("Cached country comparison from just now.")).toBeVisible({ timeout: 20_000 });
+
+  const scrollTop = await panel.evaluate((host) => host.shadowRoot?.querySelector<HTMLElement>(".panel")?.scrollTop);
+  expect(scrollTop).toBeGreaterThan(0);
+});
+
 async function routeOptionalExtensionNetwork(context: BrowserContext): Promise<void> {
   const fixtureDate = new Date().toISOString().slice(0, 10);
   await context.route("https://cdn.jsdelivr.net/**", async (route) => {

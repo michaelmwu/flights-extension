@@ -1341,6 +1341,7 @@ function render(): void {
   const selectedCodes = selectedGoogleFlightsCountries();
   const translate = t();
   const mode = currentRenderPanelMode();
+  const panelScrollTop = shadow.querySelector<HTMLElement>(".panel")?.scrollTop ?? 0;
 
   shadow.innerHTML = `
     <style>${styles()}</style>
@@ -1374,6 +1375,9 @@ function render(): void {
       }
     </section>
   `;
+
+  const panel = shadow.querySelector<HTMLElement>(".panel");
+  if (panelScrollTop > 0 && panel && !state.panelMinimized) panel.scrollTop = panelScrollTop;
 
   shadow.querySelector('[data-action="minimize-panel"]')?.addEventListener("click", () => {
     minimizePanel(shadow);
