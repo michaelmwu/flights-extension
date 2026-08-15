@@ -21,6 +21,12 @@ type GoogleFlightsSearchExpansionResult = {
   afterRows?: number;
 };
 
+type GoogleFlightsComparisonRun = {
+  controller: AbortController;
+  activeTabIds: Set<number>;
+  closedTabIds: Set<number>;
+};
+
 const GOOGLE_FLIGHTS_COMPARE_CONCURRENCY = 3;
 const GOOGLE_FLIGHTS_TAB_CREATE_SPACING_MS = 750;
 const MATRIX_AUTO_OPEN_TABS_STORAGE_KEY = "muTravelMatrixAutoOpenTabs";
@@ -29,6 +35,7 @@ const MATRIX_AUTO_OPEN_TTL_MS = 5 * 60 * 1000;
 
 let tabCreateQueue = Promise.resolve();
 let lastTabCreatedAt = 0;
+const activeGoogleFlightsComparisonRuns = new Map<string, GoogleFlightsComparisonRun>();
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") {
@@ -70,7 +77,8 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
       sendResponse({ ok: false, error: "Missing Google Flights comparison request." });
       return false;
     }
-    void compareGoogleFlightsCountries(payload, progressTabId)
+    const run = startGoogleFlightsComparison(progressTabId, payload.requestId);
+    void compareGoogleFlightsCountries(payload, progressTabId, run)
       .then(() => sendResponse({ ok: true }))
       .catch((error) => {
         const message = error instanceof Error ? error.message : "Compare failed.";
@@ -93,7 +101,8 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
       sendResponse({ ok: false, error: "Missing Google Flights comparison request." });
       return false;
     }
-    void compareGoogleFlightsSearchCountries(payload, progressTabId)
+    const run = startGoogleFlightsComparison(progressTabId, payload.requestId);
+    void compareGoogleFlightsSearchCountries(payload, progressTabId, run)
       .then(() => sendResponse({ ok: true }))
       .catch((error) => {
         const message = error instanceof Error ? error.message : "Search comparison failed.";
@@ -106,6 +115,22 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
     return true;
   }
 
+  if (payload.command === "cancelGoogleFlightsComparison") {
+    const progressTabId = sender.tab?.id;
+    if (typeof progressTabId !== "number" || typeof payload.requestId !== "string" || !payload.requestId) {
+      sendResponse({ ok: false });
+      return false;
+    }
+    const run = activeGoogleFlightsComparisonRuns.get(googleFlightsComparisonRunKey(progressTabId, payload.requestId));
+    if (!run) {
+      sendResponse({ ok: false });
+      return false;
+    }
+    cancelGoogleFlightsComparison(run);
+    sendResponse({ ok: true });
+    return false;
+  }
+
   if (payload.command !== "fetchProviderMetadata") return false;
 
   void fetchProviderMetadata(payload.baseUrl || "")
@@ -114,30 +139,100 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
   return true;
 });
 
-async function compareGoogleFlightsCountries(payload: RuntimeMessage, progressTabId?: number): Promise<void> {
+async function compareGoogleFlightsCountries(
+  payload: RuntimeMessage,
+  progressTabId: number,
+  run: GoogleFlightsComparisonRun,
+): Promise<void> {
   const baseUrl = payload.baseUrl || "";
   if (!baseUrl) throw new Error("Missing Google Flights URL.");
   const countries = Array.from(new Set((payload.countries || []).filter((country) => /^[A-Z]{2}$/.test(country))));
   const baselineOptionCount = payload.baselineOptionCount || 0;
-  await mapWithConcurrency(countries, GOOGLE_FLIGHTS_COMPARE_CONCURRENCY, async (country) => {
-    const result = await compareBookingCountry(baseUrl, country, baselineOptionCount);
-    sendGoogleFlightsCountryProgress(progressTabId, payload.requestId, result);
-    return result;
-  });
-  sendGoogleFlightsCountryComplete(progressTabId, payload.requestId, { ok: true });
+  try {
+    await mapWithConcurrency(countries, GOOGLE_FLIGHTS_COMPARE_CONCURRENCY, async (country) => {
+      throwIfGoogleFlightsComparisonCancelled(run);
+      const result = await compareBookingCountry(baseUrl, country, baselineOptionCount, run);
+      throwIfGoogleFlightsComparisonCancelled(run);
+      sendGoogleFlightsCountryProgress(progressTabId, payload.requestId, result);
+      return result;
+    });
+    sendGoogleFlightsCountryComplete(progressTabId, payload.requestId, { ok: true });
+  } catch (error) {
+    if (isGoogleFlightsComparisonCancelled(error, run)) {
+      sendGoogleFlightsCountryComplete(progressTabId, payload.requestId, { ok: true, cancelled: true });
+      return;
+    }
+    throw error;
+  } finally {
+    activeGoogleFlightsComparisonRuns.delete(googleFlightsComparisonRunKey(progressTabId, payload.requestId || ""));
+  }
 }
 
-async function compareGoogleFlightsSearchCountries(payload: RuntimeMessage, progressTabId?: number): Promise<void> {
+async function compareGoogleFlightsSearchCountries(
+  payload: RuntimeMessage,
+  progressTabId: number,
+  run: GoogleFlightsComparisonRun,
+): Promise<void> {
   const baseUrl = payload.baseUrl || "";
   if (!baseUrl) throw new Error("Missing Google Flights URL.");
   const countries = Array.from(new Set((payload.countries || []).filter((country) => /^[A-Z]{2}$/.test(country))));
   const baselineResultCount = payload.baselineSearchResultCount || 0;
-  await mapWithConcurrency(countries, GOOGLE_FLIGHTS_COMPARE_CONCURRENCY, async (country) => {
-    return compareGoogleFlightsSearchCountry(baseUrl, country, baselineResultCount, (result) => {
-      sendGoogleFlightsSearchProgress(progressTabId, payload.requestId, result);
+  try {
+    await mapWithConcurrency(countries, GOOGLE_FLIGHTS_COMPARE_CONCURRENCY, async (country) => {
+      throwIfGoogleFlightsComparisonCancelled(run);
+      return compareGoogleFlightsSearchCountry(baseUrl, country, baselineResultCount, run, (result) => {
+        throwIfGoogleFlightsComparisonCancelled(run);
+        sendGoogleFlightsSearchProgress(progressTabId, payload.requestId, result);
+      });
     });
-  });
-  sendGoogleFlightsSearchComplete(progressTabId, payload.requestId, { ok: true });
+    sendGoogleFlightsSearchComplete(progressTabId, payload.requestId, { ok: true });
+  } catch (error) {
+    if (isGoogleFlightsComparisonCancelled(error, run)) {
+      sendGoogleFlightsSearchComplete(progressTabId, payload.requestId, { ok: true, cancelled: true });
+      return;
+    }
+    throw error;
+  } finally {
+    activeGoogleFlightsComparisonRuns.delete(googleFlightsComparisonRunKey(progressTabId, payload.requestId || ""));
+  }
+}
+
+function startGoogleFlightsComparison(tabId: number, requestId: string): GoogleFlightsComparisonRun {
+  const key = googleFlightsComparisonRunKey(tabId, requestId);
+  const existing = activeGoogleFlightsComparisonRuns.get(key);
+  if (existing) cancelGoogleFlightsComparison(existing);
+  const run = { controller: new AbortController(), activeTabIds: new Set<number>(), closedTabIds: new Set<number>() };
+  activeGoogleFlightsComparisonRuns.set(key, run);
+  return run;
+}
+
+function googleFlightsComparisonRunKey(tabId: number, requestId: string): string {
+  return `${tabId}:${requestId}`;
+}
+
+function cancelGoogleFlightsComparison(run: GoogleFlightsComparisonRun): void {
+  if (run.controller.signal.aborted) return;
+  run.controller.abort();
+  for (const tabId of run.activeTabIds) {
+    run.activeTabIds.delete(tabId);
+    run.closedTabIds.add(tabId);
+    void removeTab(tabId);
+  }
+}
+
+function throwIfGoogleFlightsComparisonCancelled(run: GoogleFlightsComparisonRun): void {
+  if (!run.controller.signal.aborted) return;
+  throw googleFlightsComparisonCancelledError();
+}
+
+function isGoogleFlightsComparisonCancelled(error: unknown, run: GoogleFlightsComparisonRun): boolean {
+  return run.controller.signal.aborted || (error instanceof Error && error.name === "GoogleFlightsComparisonCancelled");
+}
+
+function googleFlightsComparisonCancelledError(): Error {
+  const error = new Error("Google Flights comparison cancelled.");
+  error.name = "GoogleFlightsComparisonCancelled";
+  return error;
 }
 
 async function openMatrixWithAutoOpen(matrixUrl: string, openedByPage = false, sourceWindowId?: number): Promise<void> {
@@ -248,7 +343,7 @@ function sendGoogleFlightsCountryProgress(
 function sendGoogleFlightsCountryComplete(
   tabId: number | undefined,
   requestId: string | undefined,
-  result: { ok: boolean; error?: string },
+  result: { ok: boolean; cancelled?: boolean; error?: string },
 ): void {
   if (typeof tabId !== "number" || !requestId) return;
   chrome.tabs.sendMessage(
@@ -286,7 +381,7 @@ function sendGoogleFlightsSearchProgress(
 function sendGoogleFlightsSearchComplete(
   tabId: number | undefined,
   requestId: string | undefined,
-  result: { ok: boolean; error?: string },
+  result: { ok: boolean; cancelled?: boolean; error?: string },
 ): void {
   if (typeof tabId !== "number" || !requestId) return;
   chrome.tabs.sendMessage(
@@ -306,24 +401,29 @@ async function compareBookingCountry(
   baseUrl: string,
   country: string,
   baselineOptionCount: number,
+  run: GoogleFlightsComparisonRun,
 ): Promise<CountryResult> {
   const url = countryComparisonUrl(baseUrl, country);
   let tabId: number | undefined;
   try {
-    const tab = await createInactiveTabPaced(url);
+    const tab = await createInactiveTabPaced(url, run);
     tabId = tab.id;
     if (typeof tabId !== "number") throw new Error("Chrome did not provide a tab id.");
-    await waitForTabComplete(tabId);
-    let result = await parseBookingComparisonTab(tabId, country, url);
+    run.activeTabIds.add(tabId);
+    await waitForTabComplete(tabId, run.controller.signal);
+    throwIfGoogleFlightsComparisonCancelled(run);
+    let result = await parseBookingComparisonTab(tabId, country, url, run.controller.signal);
     if (shouldRetrySparseResult(result, baselineOptionCount)) {
+      throwIfGoogleFlightsComparisonCancelled(run);
       await reloadTab(tabId);
-      await waitForTabComplete(tabId);
-      result = await parseBookingComparisonTab(tabId, country, url);
+      await waitForTabComplete(tabId, run.controller.signal);
+      result = await parseBookingComparisonTab(tabId, country, url, run.controller.signal);
       result.refreshed = true;
       if (isSparseResult(result, baselineOptionCount)) result.status = "sparse";
     }
     return result;
   } catch (error) {
+    if (isGoogleFlightsComparisonCancelled(error, run)) throw googleFlightsComparisonCancelledError();
     return {
       country,
       url,
@@ -332,7 +432,10 @@ async function compareBookingCountry(
       error: error instanceof Error ? error.message : "Country check failed.",
     };
   } finally {
-    if (typeof tabId === "number") await removeTab(tabId);
+    if (typeof tabId === "number") {
+      run.activeTabIds.delete(tabId);
+      if (!run.closedTabIds.delete(tabId)) await removeTab(tabId);
+    }
   }
 }
 
@@ -340,31 +443,44 @@ async function compareGoogleFlightsSearchCountry(
   baseUrl: string,
   country: string,
   baselineResultCount: number,
+  run: GoogleFlightsComparisonRun,
   onProgress?: (result: SearchCountryResult) => void,
 ): Promise<SearchCountryResult> {
   const url = countryComparisonUrl(baseUrl, country);
   let tabId: number | undefined;
   let sentProgress = false;
   try {
-    const tab = await createInactiveTabPaced(url);
+    const tab = await createInactiveTabPaced(url, run);
     tabId = tab.id;
     if (typeof tabId !== "number") throw new Error("Chrome did not provide a tab id.");
-    await waitForTabComplete(tabId);
-    let result = await parseGoogleFlightsSearchTab(tabId, country, url);
+    run.activeTabIds.add(tabId);
+    await waitForTabComplete(tabId, run.controller.signal);
+    throwIfGoogleFlightsComparisonCancelled(run);
+    let result = await parseGoogleFlightsSearchTab(tabId, country, url, run.controller.signal);
     if (baselineResultCount > 0 && result.status !== "error" && result.results.length === 0) {
+      throwIfGoogleFlightsComparisonCancelled(run);
       await reloadTab(tabId);
-      await waitForTabComplete(tabId);
-      result = await parseGoogleFlightsSearchTab(tabId, country, url);
+      await waitForTabComplete(tabId, run.controller.signal);
+      result = await parseGoogleFlightsSearchTab(tabId, country, url, run.controller.signal);
     }
+    throwIfGoogleFlightsComparisonCancelled(run);
     onProgress?.(result);
     sentProgress = true;
-    const expandedResult = await waitForExpandedGoogleFlightsSearchTab(tabId, country, url, result.results.length);
+    const expandedResult = await waitForExpandedGoogleFlightsSearchTab(
+      tabId,
+      country,
+      url,
+      result.results.length,
+      run.controller.signal,
+    );
     if (expandedResult && expandedResult.results.length > result.results.length) {
       result = expandedResult;
+      throwIfGoogleFlightsComparisonCancelled(run);
       onProgress?.(result);
     }
     return result;
   } catch (error) {
+    if (isGoogleFlightsComparisonCancelled(error, run)) throw googleFlightsComparisonCancelledError();
     const result = {
       country,
       url,
@@ -375,17 +491,26 @@ async function compareGoogleFlightsSearchCountry(
     if (!sentProgress) onProgress?.(result);
     return result;
   } finally {
-    if (typeof tabId === "number") await removeTab(tabId);
+    if (typeof tabId === "number") {
+      run.activeTabIds.delete(tabId);
+      if (!run.closedTabIds.delete(tabId)) await removeTab(tabId);
+    }
   }
 }
 
-function createInactiveTabPaced(url: string): Promise<chrome.tabs.Tab> {
+function createInactiveTabPaced(url: string, run: GoogleFlightsComparisonRun): Promise<chrome.tabs.Tab> {
   const scheduled = tabCreateQueue.then(async () => {
+    throwIfGoogleFlightsComparisonCancelled(run);
     const elapsed = Date.now() - lastTabCreatedAt;
     const waitMs = Math.max(0, GOOGLE_FLIGHTS_TAB_CREATE_SPACING_MS - elapsed);
-    if (waitMs > 0) await delay(waitMs);
+    if (waitMs > 0) await delay(waitMs, run.controller.signal);
+    throwIfGoogleFlightsComparisonCancelled(run);
     const tab = await createInactiveTab(url);
     lastTabCreatedAt = Date.now();
+    if (run.controller.signal.aborted) {
+      if (typeof tab.id === "number") await removeTab(tab.id);
+      throw googleFlightsComparisonCancelledError();
+    }
     return tab;
   });
   tabCreateQueue = scheduled.then(
@@ -405,10 +530,16 @@ function isSparseResult(result: CountryResult, baselineOptionCount: number): boo
   );
 }
 
-async function parseBookingComparisonTab(tabId: number, country: string, url: string): Promise<CountryResult> {
+async function parseBookingComparisonTab(
+  tabId: number,
+  country: string,
+  url: string,
+  signal: AbortSignal,
+): Promise<CountryResult> {
   let latest: CountryResult | null = null;
   const deadline = Date.now() + 18000;
   while (Date.now() < deadline) {
+    throwIfAborted(signal);
     try {
       latest = await sendTabMessage<CountryResult>(tabId, {
         command: "parseBookingOptions",
@@ -417,17 +548,23 @@ async function parseBookingComparisonTab(tabId: number, country: string, url: st
     } catch {
       // The content script may not be ready immediately after the tab completes.
     }
-    await delay(600);
+    await delay(600, signal);
   }
   if (latest) return { ...latest, country, url };
   return { country, url, options: [], status: "empty" };
 }
 
-async function parseGoogleFlightsSearchTab(tabId: number, country: string, url: string): Promise<SearchCountryResult> {
+async function parseGoogleFlightsSearchTab(
+  tabId: number,
+  country: string,
+  url: string,
+  signal: AbortSignal,
+): Promise<SearchCountryResult> {
   let latest: SearchCountryResult | null = null;
   const deadline = Date.now() + 18000;
   let expanded = false;
   while (Date.now() < deadline) {
+    throwIfAborted(signal);
     try {
       if (!expanded) {
         expanded = await tryExpandGoogleFlightsSearchResults(tabId);
@@ -439,7 +576,7 @@ async function parseGoogleFlightsSearchTab(tabId: number, country: string, url: 
     } catch {
       // The content script may not be ready immediately after the tab completes.
     }
-    await delay(600);
+    await delay(600, signal);
   }
   if (latest) return { ...latest, country, url };
   return { country, url, results: [], status: "empty" };
@@ -450,13 +587,15 @@ async function waitForExpandedGoogleFlightsSearchTab(
   country: string,
   url: string,
   previousResultCount: number,
+  signal: AbortSignal,
 ): Promise<SearchCountryResult | null> {
   if (previousResultCount <= 0) return null;
   const deadline = Date.now() + 6500;
   let latest: SearchCountryResult | null = null;
   let expanded = false;
   while (Date.now() < deadline) {
-    await delay(600);
+    await delay(600, signal);
+    throwIfAborted(signal);
     try {
       if (!expanded) {
         expanded = await tryExpandGoogleFlightsSearchResults(tabId);
@@ -604,14 +743,26 @@ function removeTab(tabId: number): Promise<void> {
   });
 }
 
-function waitForTabComplete(tabId: number): Promise<void> {
-  return new Promise((resolve) => {
+function waitForTabComplete(tabId: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(googleFlightsComparisonCancelledError());
+      return;
+    }
     const timeoutId = setTimeout(done, 20000);
 
     function done(): void {
       clearTimeout(timeoutId);
       chrome.tabs.onUpdated.removeListener(listener);
+      signal?.removeEventListener("abort", cancelled);
       resolve();
+    }
+
+    function cancelled(): void {
+      clearTimeout(timeoutId);
+      chrome.tabs.onUpdated.removeListener(listener);
+      signal?.removeEventListener("abort", cancelled);
+      reject(googleFlightsComparisonCancelledError());
     }
 
     function listener(updatedTabId: number, changeInfo: { status?: string }): void {
@@ -619,6 +770,7 @@ function waitForTabComplete(tabId: number): Promise<void> {
     }
 
     chrome.tabs.onUpdated.addListener(listener);
+    signal?.addEventListener("abort", cancelled, { once: true });
     chrome.tabs.get(tabId, (tab) => {
       if (!chrome.runtime.lastError && tab.status === "complete") done();
     });
@@ -638,6 +790,29 @@ function sendTabMessage<T>(tabId: number, message: unknown): Promise<T> {
   });
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(googleFlightsComparisonCancelledError());
+      return;
+    }
+    const timeoutId = setTimeout(done, ms);
+
+    function done(): void {
+      signal?.removeEventListener("abort", cancelled);
+      resolve();
+    }
+
+    function cancelled(): void {
+      clearTimeout(timeoutId);
+      signal?.removeEventListener("abort", cancelled);
+      reject(googleFlightsComparisonCancelledError());
+    }
+
+    signal?.addEventListener("abort", cancelled, { once: true });
+  });
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw googleFlightsComparisonCancelledError();
 }

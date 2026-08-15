@@ -88,6 +88,26 @@ test("opens Google Flights country comparison tabs from a routed US booking page
   ]);
 });
 
+test("stops an in-progress Google Flights comparison and retains partial results", async ({
+  context,
+  extensionServiceWorker,
+  page,
+}) => {
+  const pageUrl = "https://www.google.com/travel/flights/booking?tfs=e2e-fixture&curr=USD&gl=US";
+  await setGoogleFlightsCountries(extensionServiceWorker, ["US", "CA", "ZA"]);
+  await routeGoogleFlightsBookingFixtures(context, { comparisonDelayMs: 1000 });
+
+  await page.goto(pageUrl);
+
+  const panel = page.locator("#mooflights-google-flights-panel");
+  await panel.getByRole("button", { name: "Compare (3)" }).click();
+  await expect(panel.getByRole("progressbar", { name: "0 of 2 countries checked." })).toBeVisible();
+  await panel.getByRole("button", { name: "Stop" }).click();
+
+  await expect(panel.getByText("Stopped after 0 of 2 countries. Partial results shown.")).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Compare (3)" })).toBeEnabled();
+});
+
 test("shows the current Google Flights country in the selector comparison count", async ({
   context,
   extensionServiceWorker,
@@ -192,7 +212,7 @@ test("keeps Google Flights comparison state through transient unresolved URLs", 
   await panel.getByRole("button", { name: "Compare (3)" }).click();
   await replaceGoogleFlightsHistory(page, transientUrl);
   await waitForGoogleFlightsDebugEvent(page, "keep-state-during-transient-empty-page-key");
-  await expect(panel.getByRole("button", { name: "Checking..." })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Stop" })).toBeVisible();
   await replaceGoogleFlightsHistory(page, pageUrl);
 
   await comparisonTabsPromise;
@@ -544,6 +564,24 @@ test("renders Skyscanner search row comparison badges from captured API response
   await directPage.close();
 });
 
+test("stops an in-progress Skyscanner search comparison", async ({ context, extensionServiceWorker, page }) => {
+  const pageUrl =
+    "https://www.skyscanner.co.za/transport/flights/cju/nrt/260624/?adultsv2=1&cabinclass=economy&childrenv2=&rtn=0&outboundaltsenabled=false&inboundaltsenabled=false&currency=USD&locale=en-US&market=ZA&userSessionDataId=37a758a6-28c6-4733-ab8d-4501a8b360e8&preferdirects=false";
+  await setGoogleFlightsCountries(extensionServiceWorker, ["US", "KR"]);
+  await routeSkyscannerSearchFixtures(context, { apiDelayMs: 1000 });
+
+  await page.goto(pageUrl);
+
+  const panel = page.locator("#mooflights-google-flights-panel");
+  await expect(panel.getByRole("button", { name: "Compare rows (3)" })).toBeEnabled();
+  await panel.getByRole("button", { name: "Compare rows (3)" }).click();
+  await expect(panel.getByRole("progressbar", { name: "0 of 2 countries checked." })).toBeVisible();
+  await panel.getByRole("button", { name: "Stop" }).click();
+
+  await expect(panel.getByText("Stopped after 0 of 2 countries. Partial results shown.")).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Compare rows (3)" })).toBeEnabled();
+});
+
 test("shows the Skyscanner search panel before an API response is captured", async ({ context, page }) => {
   const pageUrl =
     "https://www.skyscanner.co.za/transport/flights/cju/nrt/260624/?adultsv2=1&cabinclass=economy&childrenv2=&rtn=0&outboundaltsenabled=false&inboundaltsenabled=false&currency=USD&locale=en-US&market=ZA&userSessionDataId=37a758a6-28c6-4733-ab8d-4501a8b360e8&preferdirects=false";
@@ -661,7 +699,7 @@ test("keeps the Google Flights panel scroll position while comparison results ar
   await expect(panel.getByText("South Africa", { exact: true })).toBeVisible();
   const comparisonTabsPromise = Promise.all(["CA", "ZA"].map((country) => waitForComparisonTab(context, country)));
   await panel.getByRole("button", { name: "Compare (3)" }).click();
-  await expect(panel.getByRole("button", { name: "Checking..." })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Stop" })).toBeVisible();
 
   const initialScroll = await panel.evaluate((host) => {
     const shadow = host.shadowRoot;
@@ -724,11 +762,18 @@ async function routeItaFixture(page: Page, body: string): Promise<void> {
   });
 }
 
-async function routeGoogleFlightsBookingFixtures(context: BrowserContext): Promise<void> {
+async function routeGoogleFlightsBookingFixtures(
+  context: BrowserContext,
+  options: { comparisonDelayMs?: number } = {},
+): Promise<void> {
   await context.route("https://www.google.com/travel/flights**", async (route) => {
+    const url = new URL(route.request().url());
+    if (options.comparisonDelayMs && url.searchParams.get("gl") !== "US") {
+      await new Promise((resolve) => setTimeout(resolve, options.comparisonDelayMs));
+    }
     await route.fulfill({
       contentType: "text/html",
-      body: googleFlightsBookingFixture(route.request().url()),
+      body: googleFlightsBookingFixture(url.toString()),
     });
   });
 }

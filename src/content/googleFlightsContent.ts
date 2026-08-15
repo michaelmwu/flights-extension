@@ -68,6 +68,8 @@ type CompareState = {
   comparingCountryCodes: string[];
   progressCompleted: number;
   progressTotal: number;
+  comparisonStopRequested: boolean;
+  comparisonStopped: boolean;
   countrySearch: string;
   language: AppLanguage;
   searchBaseline: SearchCountryResult | null;
@@ -175,6 +177,8 @@ const state: CompareState = {
   comparingCountryCodes: [],
   progressCompleted: 0,
   progressTotal: 0,
+  comparisonStopRequested: false,
+  comparisonStopped: false,
   countrySearch: "",
   language: DEFAULT_SETTINGS.language,
   searchBaseline: null,
@@ -613,6 +617,7 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
     requestId?: unknown;
     result?: unknown;
     ok?: unknown;
+    cancelled?: unknown;
     error?: unknown;
     waitForExpansion?: unknown;
   };
@@ -1038,6 +1043,8 @@ function scheduleRender(): void {
     state.comparingCacheKey = "";
     state.progressCompleted = 0;
     state.progressTotal = 0;
+    state.comparisonStopRequested = false;
+    state.comparisonStopped = false;
     state.searchBaseline = null;
     state.searchResults = [];
     state.searchBestByRowKey = {};
@@ -1109,6 +1116,8 @@ function scheduleRender(): void {
     state.comparingCacheKey = "";
     state.progressCompleted = 0;
     state.progressTotal = 0;
+    state.comparisonStopRequested = false;
+    state.comparisonStopped = false;
     state.searchBaseline = null;
     state.searchResults = [];
     state.searchBestByRowKey = {};
@@ -1358,15 +1367,11 @@ function render(): void {
                   ${renderMilesEstimatePrompt(matrixSearch)}
                   <div class="section-heading">${escapeHtml(translate("compareCountryPricing"))}</div>
                   ${renderCountrySelect(selectedCodes, countryComparisonDisplayCount(selectedCodes))}
-                  <div class="actions">
-                    <button type="button" class="wide" ${state.comparing || selectedCodes.length === 0 ? "disabled" : ""} data-action="compare-countries">
-                      ${escapeHtml(
-                        state.comparing
-                          ? translate("checking")
-                          : translate("compareCount", { count: countryComparisonDisplayCount(selectedCodes) }),
-                      )}
-                    </button>
-                  </div>
+                  ${renderComparisonAction({
+                    action: "compare-countries",
+                    label: translate("compareCount", { count: countryComparisonDisplayCount(selectedCodes) }),
+                    disabled: selectedCodes.length === 0,
+                  })}
                   ${state.error ? `<p class="error">${escapeHtml(state.error)}</p>` : ""}
                   ${renderComparisonNotice()}
                   ${renderCacheNotice()}
@@ -1474,6 +1479,9 @@ function render(): void {
   });
   shadow.querySelector('[data-action="compare-search-rows"]')?.addEventListener("click", () => {
     void compareSearchRows();
+  });
+  shadow.querySelector('[data-action="stop-comparison"]')?.addEventListener("click", () => {
+    void stopComparison();
   });
   shadow.querySelector<HTMLAnchorElement>('[data-action="open-matrix"]')?.addEventListener("click", (event) => {
     const anchor = event.currentTarget;
@@ -1606,20 +1614,56 @@ function renderSearchComparisonPanel(selectedCodes: string[]): string {
   return `
     <div class="section-heading">${escapeHtml(translate("compareVisibleFlightRows"))}</div>
     ${renderCountrySelect(selectedCodes, comparisonDisplayCount)}
-    <div class="actions">
-      <button type="button" class="wide" ${state.comparing || selectedCodes.length === 0 || visibleRows === 0 ? "disabled" : ""} data-action="compare-search-rows">
-        ${escapeHtml(state.comparing ? translate("checking") : translate("compareRowsCount", { count: comparisonDisplayCount }))}
-      </button>
-    </div>
+    ${renderComparisonAction({
+      action: "compare-search-rows",
+      label: translate("compareRowsCount", { count: comparisonDisplayCount }),
+      disabled: selectedCodes.length === 0 || visibleRows === 0,
+    })}
     ${state.error ? `<p class="error">${escapeHtml(state.error)}</p>` : ""}
-    ${
-      state.comparing
-        ? `<p class="cache-note">${escapeHtml(
-            translate("countriesChecked", { completed: state.progressCompleted, total: state.progressTotal }),
-          )}</p>`
-        : ""
-    }
+    ${renderComparisonNotice()}
     ${visibleRows === 0 ? `<p class="cache-note">${escapeHtml(emptyRowsMessage)}</p>` : ""}
+  `;
+}
+
+function renderComparisonAction({
+  action,
+  label,
+  disabled,
+}: {
+  action: "compare-countries" | "compare-search-rows";
+  label: string;
+  disabled: boolean;
+}): string {
+  const translate = t();
+  if (!state.comparing) {
+    return `
+      <div class="actions">
+        <button type="button" class="wide" ${disabled ? "disabled" : ""} data-action="${action}">
+          ${escapeHtml(label)}
+        </button>
+      </div>
+    `;
+  }
+
+  const completed = state.progressCompleted;
+  const total = state.progressTotal;
+  const progress = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+  const progressLabel = translate("countriesChecked", { completed, total });
+  return `
+    <div class="actions">
+      <div class="comparison-progress" role="group" aria-label="${escapeHtml(translate("checking"))}">
+        <span class="comparison-progress-fill" style="width: ${progress}%" aria-hidden="true"></span>
+        <div class="comparison-progress-content">
+          <span class="comparison-progress-status" role="progressbar" aria-label="${escapeHtml(progressLabel)}" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${completed}">
+            <span class="comparison-spinner" aria-hidden="true"></span>
+            <span>${escapeHtml(progressLabel)}</span>
+          </span>
+          <button type="button" class="comparison-stop" data-action="stop-comparison" aria-label="${escapeHtml(translate("stopChecking"))}" ${state.comparisonStopRequested ? "disabled" : ""}>
+            ${escapeHtml(state.comparisonStopRequested ? translate("stopping") : translate("stopChecking"))}
+          </button>
+        </div>
+      </div>
+    </div>
   `;
 }
 
@@ -1741,6 +1785,7 @@ function applyGoogleFlightsCountryInput(countryCodes: string[]): string[] {
   state.searchBestByRowKey = bestPricesBySearchRow(state.searchBaseline, state.searchResults);
   state.resultsCachedAt = 0;
   state.error = "";
+  state.comparisonStopped = false;
   return nextCountries;
 }
 
@@ -1785,9 +1830,9 @@ function renderCacheNotice(now = Date.now()): string {
 
 function renderComparisonNotice(): string {
   const translate = t();
-  if (state.comparing) {
+  if (state.comparisonStopped) {
     return `<p class="cache-note">${escapeHtml(
-      translate("countriesChecked", { completed: state.progressCompleted, total: state.progressTotal }),
+      translate("partialCountryComparison", { completed: state.progressCompleted, total: state.progressTotal }),
     )}</p>`;
   }
   const selectedCountries = selectedGoogleFlightsCountries();
@@ -2409,6 +2454,8 @@ async function compareCountries(): Promise<void> {
   state.comparing = true;
   state.comparingCountryCodes = selectedCountries;
   state.error = "";
+  state.comparisonStopRequested = false;
+  state.comparisonStopped = false;
   state.comparingRequestId = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
   state.comparingCacheKey = state.cacheKey || currentPanelComparisonCacheKey("booking");
   state.progressCompleted = 0;
@@ -2448,6 +2495,7 @@ async function compareCountries(): Promise<void> {
     state.comparingRequestId = "";
     state.comparingCacheKey = "";
     state.comparingCountryCodes = [];
+    state.comparisonStopRequested = false;
     render();
   }
 }
@@ -2473,6 +2521,8 @@ async function compareSearchRows(): Promise<void> {
   state.comparing = true;
   state.comparingCountryCodes = selectedCountries;
   state.error = "";
+  state.comparisonStopRequested = false;
+  state.comparisonStopped = false;
   state.comparingRequestId = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
   state.comparingCacheKey = state.cacheKey || currentPanelComparisonCacheKey("search");
   state.progressCompleted = 0;
@@ -2512,7 +2562,46 @@ async function compareSearchRows(): Promise<void> {
     state.comparingRequestId = "";
     state.comparingCacheKey = "";
     state.comparingCountryCodes = [];
+    state.comparisonStopRequested = false;
     render();
+  }
+}
+
+async function stopComparison(): Promise<void> {
+  const requestId = state.comparingRequestId;
+  if (!state.comparing || state.comparisonStopRequested || !requestId) return;
+
+  state.comparisonStopRequested = true;
+  render();
+
+  if (isCurrentSkyscannerSearchPage()) {
+    cancelPendingSkyscannerMarketSearches();
+    applyGoogleFlightsSearchComplete({ requestId, ok: true, cancelled: true });
+    return;
+  }
+
+  try {
+    const response = (await chrome.runtime.sendMessage({
+      command: "cancelGoogleFlightsComparison",
+      requestId,
+    })) as { ok?: boolean } | undefined;
+    if (response?.ok) return;
+  } catch {
+    // The extension may have reloaded while the comparison was running.
+  }
+
+  if (currentRenderPanelMode() === "search") {
+    applyGoogleFlightsSearchComplete({ requestId, ok: true, cancelled: true });
+  } else {
+    applyGoogleFlightsCountryComplete({ requestId, ok: true, cancelled: true });
+  }
+}
+
+function cancelPendingSkyscannerMarketSearches(): void {
+  for (const [requestId, pending] of pendingSkyscannerMarketSearches) {
+    pendingSkyscannerMarketSearches.delete(requestId);
+    window.clearTimeout(pending.timeoutId);
+    pending.reject(new Error("Comparison stopped."));
   }
 }
 
@@ -2564,10 +2653,18 @@ function applyGoogleFlightsCountryProgress(payload: { requestId?: unknown; resul
   render();
 }
 
-function applyGoogleFlightsCountryComplete(payload: { requestId?: unknown; ok?: unknown; error?: unknown }): void {
+function applyGoogleFlightsCountryComplete(payload: {
+  requestId?: unknown;
+  ok?: unknown;
+  cancelled?: unknown;
+  error?: unknown;
+}): void {
   if (typeof payload.requestId !== "string" || payload.requestId !== state.comparingRequestId) return;
+  const cancelled = payload.cancelled === true;
   if (!payload.ok) {
     state.error = typeof payload.error === "string" ? payload.error : t()("countryComparisonFailed");
+  } else if (cancelled) {
+    state.comparisonStopped = true;
   } else if (state.comparingCacheKey || state.cacheKey || state.pageKey) {
     state.resultsCachedAt = Date.now();
     pruneExpiredResultCache();
@@ -2577,11 +2674,12 @@ function applyGoogleFlightsCountryComplete(payload: { requestId?: unknown; ok?: 
       state.resultsCachedAt,
     );
   }
-  state.progressCompleted = state.progressTotal;
+  if (!cancelled) state.progressCompleted = state.progressTotal;
   state.comparing = false;
   state.comparingRequestId = "";
   state.comparingCacheKey = "";
   state.comparingCountryCodes = [];
+  state.comparisonStopRequested = false;
   render();
 }
 
@@ -2603,10 +2701,18 @@ function applyGoogleFlightsSearchProgress(payload: { requestId?: unknown; result
   render();
 }
 
-function applyGoogleFlightsSearchComplete(payload: { requestId?: unknown; ok?: unknown; error?: unknown }): void {
+function applyGoogleFlightsSearchComplete(payload: {
+  requestId?: unknown;
+  ok?: unknown;
+  cancelled?: unknown;
+  error?: unknown;
+}): void {
   if (typeof payload.requestId !== "string" || payload.requestId !== state.comparingRequestId) return;
+  const cancelled = payload.cancelled === true;
   if (!payload.ok) {
     state.error = typeof payload.error === "string" ? payload.error : t()("countryComparisonFailed");
+  } else if (cancelled) {
+    state.comparisonStopped = true;
   } else if (state.comparingCacheKey || state.cacheKey || state.pageKey) {
     state.resultsCachedAt = Date.now();
     void storeSearchComparisonCache(
@@ -2615,11 +2721,12 @@ function applyGoogleFlightsSearchComplete(payload: { requestId?: unknown; ok?: u
       state.resultsCachedAt,
     );
   }
-  state.progressCompleted = state.progressTotal;
+  if (!cancelled) state.progressCompleted = state.progressTotal;
   state.comparing = false;
   state.comparingRequestId = "";
   state.comparingCacheKey = "";
   state.comparingCountryCodes = [];
+  state.comparisonStopRequested = false;
   state.searchBestByRowKey = bestPricesBySearchRow(state.searchBaseline, state.searchResults);
   render();
   applySearchBadges();
@@ -3661,6 +3768,73 @@ function styles(): string {
     }
     .actions .wide {
       grid-column: 1 / -1;
+    }
+    .comparison-progress {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      min-height: 32px;
+      border: 1px solid #0f766e;
+      border-radius: 6px;
+      background: #0f766e;
+      color: #ffffff;
+    }
+    .comparison-progress-fill {
+      position: absolute;
+      z-index: -1;
+      inset: 0 auto 0 0;
+      background: #115e59;
+      transition: width 180ms ease-out;
+    }
+    .comparison-progress-content {
+      display: flex;
+      min-height: 32px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 2px 3px 2px 8px;
+    }
+    .comparison-progress-status {
+      display: inline-flex;
+      min-width: 0;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .comparison-progress-status > span:last-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .comparison-spinner {
+      width: 12px;
+      height: 12px;
+      flex: 0 0 auto;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: moo-flights-spin 700ms linear infinite;
+    }
+    button.comparison-stop {
+      min-width: 46px;
+      min-height: 26px;
+      border-color: rgba(255, 255, 255, 0.82);
+      background: #ffffff;
+      color: #0f766e;
+      padding: 2px 7px;
+      font-size: 12px;
+    }
+    button.comparison-stop:disabled {
+      cursor: progress;
+      opacity: 0.82;
+    }
+    @keyframes moo-flights-spin {
+      to { transform: rotate(360deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .comparison-progress-fill { transition: none; }
+      .comparison-spinner { animation: none; }
     }
     button {
       border: 1px solid #0f766e;
