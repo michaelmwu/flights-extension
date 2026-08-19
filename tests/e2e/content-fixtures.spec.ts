@@ -367,6 +367,14 @@ test("opens Skyscanner country comparison tabs from a routed final compare page"
 
   const panel = page.locator("#mooflights-google-flights-panel");
   await expect(panel).toBeAttached();
+  const matrixSearchLink = panel.getByRole("link", { name: "Search ITA Matrix" });
+  await expect(matrixSearchLink).toBeVisible();
+  const matrixSearchUrl = new URL((await matrixSearchLink.getAttribute("href")) || "");
+  const matrixSearch = JSON.parse(atob(matrixSearchUrl.searchParams.get("search") || ""));
+  expect(matrixSearch).toMatchObject({
+    type: "one-way",
+    slices: [{ origin: ["CJU"], dest: ["TYO"], dates: { departureDate: "2026-06-24" } }],
+  });
   await expect(panel.getByText("Compare country pricing")).toBeVisible();
   await expect(panel.getByRole("button", { name: "Compare (2)" })).toBeEnabled();
 

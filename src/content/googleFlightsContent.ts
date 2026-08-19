@@ -35,6 +35,7 @@ import {
   isSkyscannerFinalComparePageUrl,
   isSkyscannerFlightsPageUrl,
   isSkyscannerSearchPageUrl,
+  parseSkyscannerMatrixSearch,
   parseSkyscannerPricingOptions,
   parseSkyscannerSearchApiResponse,
   parseSkyscannerSponsoredSearchRows,
@@ -1346,7 +1347,9 @@ function render(): void {
 
   const shadow = getShadowRoot();
   if (!shadow) return;
-  const matrixSearch = parseGoogleFlightsMatrixSearch(window.location.href, currentComparableCurrencyCode());
+  const matrixSearch = isCurrentSkyscannerPage()
+    ? parseSkyscannerMatrixSearch(window.location.href, currentComparableCurrencyCode())
+    : parseGoogleFlightsMatrixSearch(window.location.href, currentComparableCurrencyCode());
   const selectedCodes = selectedGoogleFlightsCountries();
   const translate = t();
   const mode = currentRenderPanelMode();

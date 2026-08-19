@@ -502,7 +502,7 @@ function googleFlightsTripType(slices: GoogleFlightsMatrixSearch["slices"]): Goo
   return "multi-city";
 }
 
-function buildItaMatrixSearchUrl(
+export function buildItaMatrixSearchUrl(
   tripType: GoogleFlightsMatrixSearch["tripType"],
   slices: GoogleFlightsMatrixSearch["slices"],
   cabin: GoogleFlightsMatrixCabin,

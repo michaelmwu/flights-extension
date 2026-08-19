@@ -2,6 +2,7 @@ import { countryComparisonUrl } from "./countryComparison";
 import {
   isSkyscannerFinalComparePageUrl,
   isSkyscannerSearchPageUrl,
+  parseSkyscannerMatrixSearch,
   parseSkyscannerPricingOptions,
   parseSkyscannerSearchApiResponse,
   parseSkyscannerSponsoredSearchRows,
@@ -12,6 +13,55 @@ import {
 } from "./skyscannerBooking";
 
 describe("Skyscanner country comparison parser", () => {
+  it("builds an ITA Matrix search from Skyscanner route URLs", () => {
+    const result = parseSkyscannerMatrixSearch(
+      "https://www.skyscanner.com/transport/flights/cju/tyoa/260624/260627/config/example?cabinclass=business&currency=KRW",
+    );
+
+    expect(result).toMatchObject({
+      tripType: "round-trip",
+      cabin: "BUSINESS",
+      currency: "KRW",
+      slices: [
+        { origin: "CJU", destination: "TYO", departureDate: "2026-06-24" },
+        { origin: "TYO", destination: "CJU", departureDate: "2026-06-27" },
+      ],
+    });
+
+    const matrixUrl = new URL(result?.matrixUrl || "");
+    const payload = JSON.parse(atob(matrixUrl.searchParams.get("search") || ""));
+    expect(payload).toMatchObject({
+      type: "round-trip",
+      mooFlightsAutoOpen: "1",
+      mooFlightsAutoSearch: "1",
+      slices: [
+        {
+          origin: ["CJU"],
+          dest: ["TYO"],
+          dates: { departureDate: "2026-06-24", returnDate: "2026-06-27" },
+        },
+      ],
+      options: { cabin: "BUSINESS", currency: { code: "KRW" } },
+    });
+  });
+
+  it("builds multi-city ITA Matrix searches from Skyscanner URLs", () => {
+    const result = parseSkyscannerMatrixSearch(
+      "https://www.skyscanner.com/transport/d/tpet/2026-06-24/tyoa/tyoa/2026-06-27/sela/?cabinclass=premiumeconomy",
+      "TWD",
+    );
+
+    expect(result).toMatchObject({
+      tripType: "multi-city",
+      cabin: "PREMIUM-COACH",
+      currency: "TWD",
+      slices: [
+        { origin: "TPE", destination: "TYO", departureDate: "2026-06-24" },
+        { origin: "TYO", destination: "SEL", departureDate: "2026-06-27" },
+      ],
+    });
+  });
+
   it("recognizes final compare pages", () => {
     const url =
       "https://www.skyscanner.com/transport/flights/cju/tyoa/260624/config/10562-2606241255--32128-0-14788-2606241525?adultsv2=1&cabinclass=economy";
