@@ -76,6 +76,19 @@ describe("Skyscanner country comparison parser", () => {
     ).toMatchObject({ slices: [{ departureDate: "2028-02-29" }] });
   });
 
+  it("rejects incomplete Skyscanner route components while allowing config termination", () => {
+    expect(
+      parseSkyscannerMatrixSearch("https://www.skyscanner.com/transport/flights/cju/nrt/260624/config/example"),
+    ).toMatchObject({ tripType: "one-way" });
+    expect(
+      parseSkyscannerMatrixSearch("https://www.skyscanner.com/transport/flights/cju/nrt/260624/not-a-date/"),
+    ).toBeNull();
+    expect(parseSkyscannerMatrixSearch("https://www.skyscanner.com/transport/d/cju/2026-06-24/nrt/tyoa/")).toBeNull();
+    expect(
+      parseSkyscannerMatrixSearch("https://www.skyscanner.com/transport/d/cju/2026-06-24/nrt/config/example"),
+    ).toMatchObject({ tripType: "one-way" });
+  });
+
   it("recognizes final compare pages", () => {
     const url =
       "https://www.skyscanner.com/transport/flights/cju/tyoa/260624/config/10562-2606241255--32128-0-14788-2606241525?adultsv2=1&cabinclass=economy";

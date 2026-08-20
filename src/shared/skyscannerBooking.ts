@@ -127,16 +127,18 @@ function skyscannerMatrixSlices(url: URL): GoogleFlightsMatrixSearch["slices"] {
     const departureDate = skyscannerMatrixDate(parts[4]);
     if (!origin || !destination || !departureDate) return [];
 
+    if (!parts[5] || parts[5] === "config") return [matrixSlice(origin, destination, departureDate)];
+
     const returnDate = skyscannerMatrixDate(parts[5]);
-    return returnDate
-      ? [matrixSlice(origin, destination, departureDate), matrixSlice(destination, origin, returnDate)]
-      : [matrixSlice(origin, destination, departureDate)];
+    if (!returnDate) return [];
+    return [matrixSlice(origin, destination, departureDate), matrixSlice(destination, origin, returnDate)];
   }
 
   if (parts[1] !== "d") return [];
   const slices: GoogleFlightsMatrixSearch["slices"] = [];
-  for (let index = 2; index + 2 < parts.length; index += 3) {
+  for (let index = 2; index < parts.length; index += 3) {
     if (parts[index] === "config") break;
+    if (index + 2 >= parts.length) return [];
     const origin = matrixLocationCode(parts[index]);
     const departureDate = skyscannerMatrixDate(parts[index + 1]);
     const destination = matrixLocationCode(parts[index + 2]);
