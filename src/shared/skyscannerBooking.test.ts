@@ -62,6 +62,20 @@ describe("Skyscanner country comparison parser", () => {
     });
   });
 
+  it("uses a supported fallback currency and rejects calendar-invalid route dates", () => {
+    expect(
+      parseSkyscannerMatrixSearch("https://www.skyscanner.com/transport/flights/cju/nrt/260624/?currency=ZZZ", "KRW"),
+    ).toMatchObject({ currency: "KRW" });
+    expect(
+      parseSkyscannerMatrixSearch("https://www.skyscanner.com/transport/flights/cju/nrt/260624/?currency=ZZZ", "BAD"),
+    ).toMatchObject({ currency: "USD" });
+    expect(parseSkyscannerMatrixSearch("https://www.skyscanner.com/transport/flights/cju/nrt/260231/")).toBeNull();
+    expect(parseSkyscannerMatrixSearch("https://www.skyscanner.com/transport/flights/cju/nrt/2026-02-31/")).toBeNull();
+    expect(
+      parseSkyscannerMatrixSearch("https://www.skyscanner.com/transport/flights/cju/nrt/2028-02-29/"),
+    ).toMatchObject({ slices: [{ departureDate: "2028-02-29" }] });
+  });
+
   it("recognizes final compare pages", () => {
     const url =
       "https://www.skyscanner.com/transport/flights/cju/tyoa/260624/config/10562-2606241255--32128-0-14788-2606241525?adultsv2=1&cabinclass=economy";

@@ -1,5 +1,9 @@
 import type { BookingOption, CountryResult, SearchCountryResult, SearchResult } from "./countryComparison";
-import { buildItaMatrixSearchUrl, type GoogleFlightsMatrixSearch } from "./googleFlightsBooking";
+import {
+  buildItaMatrixSearchUrl,
+  type GoogleFlightsMatrixSearch,
+  normalizeGoogleFlightsCurrency,
+} from "./googleFlightsBooking";
 import { skyscannerPlaceToGoogleFlightsCode } from "./providerPlaceMappings";
 
 const SKYSCANNER_FLIGHTS_PATH_RE = /^\/transport\/(?:flights|d)\//;
@@ -99,7 +103,10 @@ export function parseSkyscannerMatrixSearch(url: string, fallbackCurrency = "USD
 
   const tripType = skyscannerMatrixTripType(slices);
   const cabin = skyscannerMatrixCabin(parsedUrl.searchParams.get("cabinclass"));
-  const currency = normalizeCurrencyCode(parsedUrl.searchParams.get("currency") || fallbackCurrency);
+  const currency =
+    normalizeGoogleFlightsCurrency(parsedUrl.searchParams.get("currency")) ||
+    normalizeGoogleFlightsCurrency(fallbackCurrency) ||
+    "USD";
   return {
     tripType,
     cabin,
@@ -159,8 +166,20 @@ function matrixLocationCode(value: string | undefined): string {
 
 function skyscannerMatrixDate(value: string | undefined): string {
   const date = value?.trim() || "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
-  return /^\d{6}$/.test(date) ? `20${date.slice(0, 2)}-${date.slice(2, 4)}-${date.slice(4, 6)}` : "";
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? date
+    : /^\d{6}$/.test(date)
+      ? `20${date.slice(0, 2)}-${date.slice(2, 4)}-${date.slice(4, 6)}`
+      : "";
+  if (!normalized) return "";
+
+  const [year, month, day] = normalized.split("-").map(Number);
+  const daysInMonth = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth[month - 1] ? normalized : "";
+}
+
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
 
 function skyscannerMatrixTripType(slices: GoogleFlightsMatrixSearch["slices"]): GoogleFlightsMatrixSearch["tripType"] {
