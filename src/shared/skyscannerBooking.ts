@@ -101,7 +101,7 @@ export function parseSkyscannerMatrixSearch(url: string, fallbackCurrency = "USD
   const slices = skyscannerMatrixSlices(parsedUrl);
   if (slices.length === 0) return null;
 
-  const tripType = skyscannerMatrixTripType(slices);
+  const tripType = skyscannerMatrixTripType(slices, parsedUrl.pathname.startsWith("/transport/d/"));
   const cabin = skyscannerMatrixCabin(parsedUrl.searchParams.get("cabinclass"));
   const currency =
     normalizeGoogleFlightsCurrency(parsedUrl.searchParams.get("currency")) ||
@@ -184,8 +184,12 @@ function isLeapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
 
-function skyscannerMatrixTripType(slices: GoogleFlightsMatrixSearch["slices"]): GoogleFlightsMatrixSearch["tripType"] {
+function skyscannerMatrixTripType(
+  slices: GoogleFlightsMatrixSearch["slices"],
+  isMultiCityRoute: boolean,
+): GoogleFlightsMatrixSearch["tripType"] {
   if (slices.length === 1) return "one-way";
+  if (isMultiCityRoute) return "multi-city";
   const [first, second] = slices;
   return slices.length === 2 && first?.origin === second?.destination && first?.destination === second?.origin
     ? "round-trip"

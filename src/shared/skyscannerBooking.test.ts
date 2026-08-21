@@ -62,6 +62,23 @@ describe("Skyscanner country comparison parser", () => {
     });
   });
 
+  it("preserves two-slice Skyscanner multi-city searches with reversed endpoints", () => {
+    const result = parseSkyscannerMatrixSearch(
+      "https://www.skyscanner.com/transport/d/cju/2026-06-24/nrt/nrt/2026-06-27/cju/?cabinclass=economy",
+    );
+
+    expect(result).toMatchObject({
+      tripType: "multi-city",
+      slices: [
+        { origin: "CJU", destination: "NRT", departureDate: "2026-06-24" },
+        { origin: "NRT", destination: "CJU", departureDate: "2026-06-27" },
+      ],
+    });
+    const payload = JSON.parse(atob(new URL(result?.matrixUrl || "").searchParams.get("search") || ""));
+    expect(payload).toMatchObject({ type: "multi-city" });
+    expect(payload.slices).toHaveLength(2);
+  });
+
   it("uses a supported fallback currency and rejects calendar-invalid route dates", () => {
     expect(
       parseSkyscannerMatrixSearch("https://www.skyscanner.com/transport/flights/cju/nrt/260624/?currency=ZZZ", "KRW"),
