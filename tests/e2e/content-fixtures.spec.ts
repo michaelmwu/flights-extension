@@ -823,7 +823,8 @@ async function routeSkyscannerSearchFixtures(
   await context.route(/https:\/\/(?:[^/]+\.)?skyscanner\.[^/]+(?:\.[^/]+)?\/.*/, async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname === "/g/radar/api/v2/web-unified-search/") {
-      const market = route.request().headers()["x-skyscanner-market"] || "";
+      const requestBody = jsonObject(route.request().postData() || "");
+      const market = route.request().headers()["x-skyscanner-market"] || String(requestBody.market || "");
       const delayMs = options.apiDelayForMarket?.(market) ?? options.apiDelayMs ?? 0;
       if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
       await route.fulfill({
