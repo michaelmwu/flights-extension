@@ -1,4 +1,10 @@
 import type { BookingOption, CountryResult, SearchCountryResult, SearchResult } from "./countryComparison";
+import {
+  buildItaMatrixSearchUrl,
+  type GoogleFlightsMatrixSearch,
+  normalizeGoogleFlightsCurrency,
+} from "./googleFlightsBooking";
+import { skyscannerPlaceToGoogleFlightsCode } from "./providerPlaceMappings";
 
 const SKYSCANNER_FLIGHTS_PATH_RE = /^\/transport\/(?:flights|d)\//;
 const SKYSCANNER_CONFIG_PATH_RE = /\/config\/[^/]+/;
@@ -82,6 +88,120 @@ const SKYSCANNER_DEFAULT_COUNTRY_CURRENCIES: Record<string, string> = {
   VN: "VND",
   ZA: "ZAR",
 };
+
+export function parseSkyscannerMatrixSearch(url: string, fallbackCurrency = "USD"): GoogleFlightsMatrixSearch | null {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return null;
+  }
+  if (!isSkyscannerFlightsPage(parsedUrl)) return null;
+
+  const slices = skyscannerMatrixSlices(parsedUrl);
+  if (slices.length === 0) return null;
+
+  const tripType = skyscannerMatrixTripType(slices, parsedUrl.pathname.startsWith("/transport/d/"));
+  const cabin = skyscannerMatrixCabin(parsedUrl.searchParams.get("cabinclass"));
+  const currency =
+    normalizeGoogleFlightsCurrency(parsedUrl.searchParams.get("currency")) ||
+    normalizeGoogleFlightsCurrency(fallbackCurrency) ||
+    "USD";
+  return {
+    tripType,
+    cabin,
+    currency,
+    slices,
+    carriers: [],
+    matrixUrl: buildItaMatrixSearchUrl(tripType, slices, cabin, currency),
+  };
+}
+
+function skyscannerMatrixSlices(url: URL): GoogleFlightsMatrixSearch["slices"] {
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts[0] !== "transport") return [];
+
+  if (parts[1] === "flights") {
+    const origin = matrixLocationCode(parts[2]);
+    const destination = matrixLocationCode(parts[3]);
+    const departureDate = skyscannerMatrixDate(parts[4]);
+    if (!origin || !destination || !departureDate) return [];
+
+    if (!parts[5] || parts[5] === "config") return [matrixSlice(origin, destination, departureDate)];
+
+    const returnDate = skyscannerMatrixDate(parts[5]);
+    if (!returnDate) return [];
+    return [matrixSlice(origin, destination, departureDate), matrixSlice(destination, origin, returnDate)];
+  }
+
+  if (parts[1] !== "d") return [];
+  const slices: GoogleFlightsMatrixSearch["slices"] = [];
+  for (let index = 2; index < parts.length; index += 3) {
+    if (parts[index] === "config") break;
+    if (index + 2 >= parts.length) return [];
+    const origin = matrixLocationCode(parts[index]);
+    const departureDate = skyscannerMatrixDate(parts[index + 1]);
+    const destination = matrixLocationCode(parts[index + 2]);
+    if (!origin || !destination || !departureDate) return [];
+    slices.push(matrixSlice(origin, destination, departureDate));
+  }
+  return slices;
+}
+
+function matrixSlice(
+  origin: string,
+  destination: string,
+  departureDate: string,
+): GoogleFlightsMatrixSearch["slices"][number] {
+  return {
+    origin,
+    destination,
+    departureDate,
+    segments: [{ origin, destination, departureDate }],
+  };
+}
+
+function matrixLocationCode(value: string | undefined): string {
+  const code = value?.trim().toUpperCase() || "";
+  return skyscannerPlaceToGoogleFlightsCode(code) || (/^[A-Z0-9]{3,4}$/.test(code) ? code : "");
+}
+
+function skyscannerMatrixDate(value: string | undefined): string {
+  const date = value?.trim() || "";
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? date
+    : /^\d{6}$/.test(date)
+      ? `20${date.slice(0, 2)}-${date.slice(2, 4)}-${date.slice(4, 6)}`
+      : "";
+  if (!normalized) return "";
+
+  const [year, month, day] = normalized.split("-").map(Number);
+  const daysInMonth = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth[month - 1] ? normalized : "";
+}
+
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+}
+
+function skyscannerMatrixTripType(
+  slices: GoogleFlightsMatrixSearch["slices"],
+  isMultiCityRoute: boolean,
+): GoogleFlightsMatrixSearch["tripType"] {
+  if (slices.length === 1) return "one-way";
+  if (isMultiCityRoute) return "multi-city";
+  const [first, second] = slices;
+  return slices.length === 2 && first?.origin === second?.destination && first?.destination === second?.origin
+    ? "round-trip"
+    : "multi-city";
+}
+
+function skyscannerMatrixCabin(value: string | null): GoogleFlightsMatrixSearch["cabin"] {
+  if (value === "premiumeconomy") return "PREMIUM-COACH";
+  if (value === "business") return "BUSINESS";
+  if (value === "first") return "FIRST";
+  return "COACH";
+}
 
 export function skyscannerCountryUrl(baseUrl: string, country: string, currency?: string): string {
   const url = new URL(baseUrl);

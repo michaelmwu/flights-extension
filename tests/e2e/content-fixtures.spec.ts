@@ -95,16 +95,19 @@ test("stops an in-progress Google Flights comparison and retains partial results
 }) => {
   const pageUrl = "https://www.google.com/travel/flights/booking?tfs=e2e-fixture&curr=USD&gl=US";
   await setGoogleFlightsCountries(extensionServiceWorker, ["US", "CA", "ZA"]);
-  await routeGoogleFlightsBookingFixtures(context, { comparisonDelayMs: 1000 });
+  await routeGoogleFlightsBookingFixtures(context, {
+    comparisonDelayForCountry: (country) => (country === "ZA" ? 10_000 : 0),
+  });
 
   await page.goto(pageUrl);
 
   const panel = page.locator("#mooflights-google-flights-panel");
   await panel.getByRole("button", { name: "Compare (3)" }).click();
-  await expect(panel.getByRole("progressbar", { name: "0 of 2 countries checked." })).toBeVisible();
+  await expect(panel.getByText("Canada", { exact: true })).toBeVisible({ timeout: 20_000 });
   await panel.getByRole("button", { name: "Stop" }).click();
 
-  await expect(panel.getByText("Stopped after 0 of 2 countries. Partial results shown.")).toBeVisible();
+  await expect(panel.getByText("Stopped after 1 of 2 countries. Partial results shown.")).toBeVisible();
+  await expect(panel.getByText("Canada", { exact: true })).toBeVisible();
   await expect(panel.getByRole("button", { name: "Compare (3)" })).toBeEnabled();
 });
 
@@ -367,6 +370,14 @@ test("opens Skyscanner country comparison tabs from a routed final compare page"
 
   const panel = page.locator("#mooflights-google-flights-panel");
   await expect(panel).toBeAttached();
+  const matrixSearchLink = panel.getByRole("link", { name: "Search ITA Matrix" });
+  await expect(matrixSearchLink).toBeVisible();
+  const matrixSearchUrl = new URL((await matrixSearchLink.getAttribute("href")) || "");
+  const matrixSearch = JSON.parse(atob(matrixSearchUrl.searchParams.get("search") || ""));
+  expect(matrixSearch).toMatchObject({
+    type: "one-way",
+    slices: [{ origin: ["CJU"], dest: ["TYO"], dates: { departureDate: "2026-06-24" } }],
+  });
   await expect(panel.getByText("Compare country pricing")).toBeVisible();
   await expect(panel.getByRole("button", { name: "Compare (2)" })).toBeEnabled();
 
@@ -567,18 +578,22 @@ test("renders Skyscanner search row comparison badges from captured API response
 test("stops an in-progress Skyscanner search comparison", async ({ context, extensionServiceWorker, page }) => {
   const pageUrl =
     "https://www.skyscanner.co.za/transport/flights/cju/nrt/260624/?adultsv2=1&cabinclass=economy&childrenv2=&rtn=0&outboundaltsenabled=false&inboundaltsenabled=false&currency=USD&locale=en-US&market=ZA&userSessionDataId=37a758a6-28c6-4733-ab8d-4501a8b360e8&preferdirects=false";
-  await setGoogleFlightsCountries(extensionServiceWorker, ["US", "KR"]);
-  await routeSkyscannerSearchFixtures(context, { apiDelayMs: 1000 });
+  await setGoogleFlightsCountries(extensionServiceWorker, ["KR", "US"]);
+  await routeSkyscannerSearchFixtures(context, {
+    apiDelayForMarket: (market) => (market === "US" ? 1000 : 0),
+  });
 
   await page.goto(pageUrl);
 
   const panel = page.locator("#mooflights-google-flights-panel");
   await expect(panel.getByRole("button", { name: "Compare rows (3)" })).toBeEnabled();
   await panel.getByRole("button", { name: "Compare rows (3)" }).click();
-  await expect(panel.getByRole("progressbar", { name: "0 of 2 countries checked." })).toBeVisible();
+  await expect(panel.getByRole("progressbar", { name: "1 of 2 countries checked." })).toBeVisible();
+  await expect(page.locator("[data-moo-flights-search-badge]", { hasText: "South Korea $180" })).toBeVisible();
   await panel.getByRole("button", { name: "Stop" }).click();
 
-  await expect(panel.getByText("Stopped after 0 of 2 countries. Partial results shown.")).toBeVisible();
+  await expect(panel.getByText("Stopped after 1 of 2 countries. Partial results shown.")).toBeVisible();
+  await expect(page.locator("[data-moo-flights-search-badge]", { hasText: "South Korea $180" })).toBeVisible();
   await expect(panel.getByRole("button", { name: "Compare rows (3)" })).toBeEnabled();
 });
 
@@ -667,7 +682,7 @@ test("renders Google Flights cached country comparison prices on routed booking 
 }) => {
   const pageUrl = "https://www.google.com/travel/flights/booking?tfs=e2e-fixture&curr=USD&gl=US";
   await setGoogleFlightsCachedResults(extensionServiceWorker, pageUrl);
-  await routeGoogleFlightsBookingFixtures(context);
+  await routeGoogleFlightsBookingFixtures(context, { comparisonDelayMs: 1000 });
 
   await page.goto(pageUrl);
 
@@ -764,12 +779,15 @@ async function routeItaFixture(page: Page, body: string): Promise<void> {
 
 async function routeGoogleFlightsBookingFixtures(
   context: BrowserContext,
-  options: { comparisonDelayMs?: number } = {},
+  options: { comparisonDelayMs?: number; comparisonDelayForCountry?: (country: string) => number } = {},
 ): Promise<void> {
   await context.route("https://www.google.com/travel/flights**", async (route) => {
     const url = new URL(route.request().url());
-    if (options.comparisonDelayMs && url.searchParams.get("gl") !== "US") {
-      await new Promise((resolve) => setTimeout(resolve, options.comparisonDelayMs));
+    const country = url.searchParams.get("gl") || "";
+    const delayMs =
+      country === "US" ? 0 : (options.comparisonDelayForCountry?.(country) ?? options.comparisonDelayMs ?? 0);
+    if (delayMs) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
     await route.fulfill({
       contentType: "text/html",
@@ -798,13 +816,17 @@ async function routeSkyscannerSearchFixtures(
     includeApiFetch?: boolean;
     includeApiFetchForUrl?: (url: string) => boolean;
     apiDelayMs?: number;
+    apiDelayForMarket?: (market: string) => number;
     delayedCurrencyLabel?: string;
   } = {},
 ): Promise<void> {
   await context.route(/https:\/\/(?:[^/]+\.)?skyscanner\.[^/]+(?:\.[^/]+)?\/.*/, async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname === "/g/radar/api/v2/web-unified-search/") {
-      if (options.apiDelayMs) await new Promise((resolve) => setTimeout(resolve, options.apiDelayMs));
+      const requestBody = jsonObject(route.request().postData() || "");
+      const market = route.request().headers()["x-skyscanner-market"] || String(requestBody.market || "");
+      const delayMs = options.apiDelayForMarket?.(market) ?? options.apiDelayMs ?? 0;
+      if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify(
